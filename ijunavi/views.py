@@ -13,3 +13,6 @@ def login_view(request):
 
 def signup_view(request):
     return render(request, 'ijunavi/signup.html')
+
+def chat_view(request):
+    return render(request, 'ijunavi/chat.html')

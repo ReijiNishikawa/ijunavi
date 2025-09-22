@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チャット</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div class="chat-container">
+        <h1>チャット画面</h1>
+        <div class="chat-box">
+            <p>ここにメッセージが表示されます</p>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="text" name="message" placeholder="メッセージを入力">
+            <button type="submit">送信</button>
+        </form>
+    </div>
+</body>
+</html>
