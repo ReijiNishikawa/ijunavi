@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マイページ</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div id="app">
+  <header>
+    <h1>いじゅナビ</h1>
+    <h2>マイページ</h2>
+  </header>
+
+  <main>
+    <section>
+      <pre>
+--------------------
+■ プロフィール画像（プレースホルダ）
+　ユーザー名：{{ profile.username }}
+
+メールアドレス：{{ profile.email }}
+
+履歴・実績
+{% for line in history_lines %}
+・{{ line }}
+{% endfor %}
+
+[プロフィール編集]
+[ログアウト]
+--------------------
+      </pre>
+    </section>
+  </main>
+
+  <footer>
+      <nav aria-label="ボトムタブ">
+        <ul style="list-style:none; padding:0; margin:16px 0; display:flex; justify-content:space-around;">
+          <li><a href="{% url 'chat' %}" aria-current="page">chat</a></li>
+          <li><a href="/mypage/">my page</a></li>
+          <li><a href="/bookmark/">bookmark</a></li>
+        </ul>
+      </nav>
+    </footer>
+    </div>
+</body>
+</html>

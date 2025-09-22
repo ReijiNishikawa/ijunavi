@@ -100,3 +100,70 @@ def chat_view(request):
 def chat_history(request):
     messages = request.session.get("messages", [])
     return render(request, 'ijunavi/history.html', {"messages": messages})
+
+def _get_profile(request):
+    """セッションからプロフィール取得（なければ仮データ）"""
+    profile = request.session.get("profile")
+    if not profile:
+        profile = {
+            "username": "ユーザー名",
+            "email": "xxx@xx.xx",
+            "image": None,  # 画像は未使用（プレースホルダ）
+        }
+        request.session["profile"] = profile
+    return profile
+
+def _get_bookmarks(request):
+    """セッションからブックマーク一覧取得（例データ）"""
+    bms = request.session.get("bookmarks")
+    if bms is None:
+        # 初回は空。動作確認用にサンプルを入れたい場合は下のコメントを外す
+        # bms = [{
+        #   "title": "【地図サムネイル】施設名",
+        #   "address": "住所：東京都○○区…",
+        #   "saved_at": str(timezone.now())[:16],
+        # }]
+        bms = []
+        request.session["bookmarks"] = bms
+    return bms
+
+def mypage_view(request):
+    """マイページ（表示のみ）"""
+    profile = _get_profile(request)
+
+    # 簡易な「履歴・実績」：チャット履歴の最後2件をサンプル表示
+    chat_msgs = request.session.get("messages", [])
+    history_lines = []
+    if chat_msgs:
+        # 直近2件を抜粋（存在すれば）
+        tail = chat_msgs[-2:] if len(chat_msgs) >= 2 else chat_msgs
+        for m in tail:
+            history_lines.append(f"{m.get('role','')} を保存しました（仮）")
+    else:
+        history_lines.append("履歴はまだありません")
+
+    return render(request, 'ijunavi/mypage.html', {
+        "profile": profile,
+        "history_lines": history_lines,
+    })
+
+def bookmark_view(request):
+    """ブックマーク一覧"""
+    bookmarks = _get_bookmarks(request)
+    return render(request, 'ijunavi/bookmark.html', {
+        "bookmarks": bookmarks,
+    })
+
+def bookmark_remove(request):
+    """ブックマーク解除（POST: index）"""
+    if request.method == "POST":
+        idx = request.POST.get("index")
+        bookmarks = _get_bookmarks(request)
+        try:
+            i = int(idx)
+            if 0 <= i < len(bookmarks):
+                bookmarks.pop(i)
+                request.session["bookmarks"] = bookmarks
+        except Exception:
+            pass
+    return redirect("bookmark")
