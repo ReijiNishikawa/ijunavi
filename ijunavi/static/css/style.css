@@ -1,0 +1,49 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #e0f2e0; /* 背景色 */
+    font-family: sans-serif;
+}
+.container {
+    text-align: center;
+    padding: 2rem;
+    background-color: #f0fdf0; /* コンテナの背景色 */
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    
+}
+.message {
+    margin-top: 1rem;
+    margin-bottom: 2rem;
+    font-size: 1.2rem;
+    color: #333;
+}
+.button {
+    display: block;
+    width: 250px;
+    padding: 15px;
+    margin: 10px auto;
+    border: none;
+    border-radius: 50px;
+    font-size: 1rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+.login-button {
+    background-color: #90ee90; /* ログインボタンの色 */
+    color: white;
+}
+.login-button:hover {
+    background-color: #76c876;
+}
+.signup-button {
+    background-color: #b3e6b3; /* 新規登録ボタンの色 */
+    color: #333;
+}
+.signup-button:hover {
+    background-color: #99d699;
+}

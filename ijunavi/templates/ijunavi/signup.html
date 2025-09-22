@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOP</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <p class="message">話すだけで、<br>「ぴったりの街」と出会える</p>
+        <a href="{% url 'login' %}" class="button login-button">ログイン</a>
+        <a href="{% url 'signup' %}" class="button signup-button">新規登録</a>
+    </div>
