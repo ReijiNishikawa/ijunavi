@@ -8,16 +8,76 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
-    <div class="chat-container">
-        <h1>チャット画面</h1>
-        <div class="chat-box">
-            <p>ここにメッセージが表示されます</p>
-        </div>
-        <form method="post">
+  <div id="app">
+
+    <!-- ヘッダー -->
+    <header>
+      <h1>いじゅナビ</h1>
+    </header>
+
+    <main>
+      {% if not chat_active %}
+        <!-- 初期画面：開始／履歴 -->
+        <section aria-label="チャット操作">
+          <form method="post" style="margin: 16px 0;">
             {% csrf_token %}
-            <input type="text" name="message" placeholder="メッセージを入力">
-            <button type="submit">送信</button>
-        </form>
-    </div>
+            <input type="hidden" name="action" value="start">
+            <button type="submit" style="display:block; width:100%; height:48px;">
+              チャットボットを開始
+            </button>
+          </form>
+
+          <p style="margin: 0 0 16px;">
+            <a href="{% url 'history' %}" style="display:block; width:100%; height:48px; line-height:48px; text-align:center;">
+              履歴をみる
+            </a>
+          </p>
+        </section>
+
+      {% else %}
+        <!-- チャット画面 -->
+        <section aria-label="チャットログ">
+          <div>
+            {% if messages %}
+              <ul>
+                {% for m in messages %}
+                  <li><strong>{{ m.role }}：</strong> {{ m.text }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p>ここにメッセージが表示されます</p>
+            {% endif %}
+          </div>
+
+          <!-- 入力フォーム -->
+          <form method="post" style="margin-top:8px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="send">
+            <input type="text" name="message" placeholder="メッセージを入力" style="width:100%; height:40px;">
+            <button type="submit" style="display:block; width:100%; height:44px; margin-top:8px;">送信</button>
+          </form>
+
+          <!-- リセット -->
+          <form method="post" style="margin-top:8px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reset">
+            <button type="submit" style="display:block; width:100%; height:40px;">終了してリセット</button>
+          </form>
+        </section>
+      {% endif %}
+    </main>
+
+    <!-- フッターのタブ -->
+    <footer>
+      <nav aria-label="ボトムタブ">
+        <ul style="list-style:none; padding:0; margin:16px 0; display:flex; justify-content:space-around;">
+          <li><a href="{% url 'chat' %}" aria-current="page">chat</a></li>
+          <li><a href="/mypage/">my page</a></li>
+          <li><a href="/bookmark/">bookmark</a></li>
+        </ul>
+      </nav>
+    </footer>
+
+  </div>
 </body>
 </html>
