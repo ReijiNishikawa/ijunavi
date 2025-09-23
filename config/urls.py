@@ -21,6 +21,8 @@ from ijunavi import views as ijunavi_views
 urlpatterns = [
         path('login/', ijunavi_views.login_view, name='login'),
     path('signup/', ijunavi_views.signup_view, name='signup'),
+    path('chat/', ijunavi_views.chat_view, name='chat'),
+    path('chat/history/', ijunavi_views.chat_history, name='history'), 
     path('admin/', admin.site.urls),
     path('', ijunavi_views.top, name='top'),
 ]
