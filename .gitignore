@@ -1,3 +1,4 @@
+
 # SQLite DB
 db.sqlite3
 
@@ -9,3 +10,10 @@ __pycache__/
 
 # VSCode settings
 .vscode/
+
+venv/
+__pycache__/
+*.pyc
+*.log
+db.sqlite3
+
