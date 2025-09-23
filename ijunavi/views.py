@@ -152,12 +152,6 @@ def chat_view(request):
 def top(request):
     return render(request, 'ijunavi/top.html')
 
-def login_view(request):
-    return render(request, 'ijunavi/login.html')
-
-def signup_view(request):
-    return render(request, 'ijunavi/signup.html')
-
 def chat_history(request):
     messages = request.session.get("messages", [])
     return render(request, 'ijunavi/history.html', {"messages": messages})
