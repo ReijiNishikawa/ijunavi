@@ -24,3 +24,4 @@ class SignInForm(forms.ModelForm):
         validate_password(self.cleaned_data.get('password'), user)
         user.set_password(self.cleaned_data.get('password'))
         user.save()
+        return user

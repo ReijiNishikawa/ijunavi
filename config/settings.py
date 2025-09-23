@@ -38,7 +38,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'ijunavi',
-    'authtest',
     'accounts',
 ]
 
@@ -128,3 +127,7 @@ LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'top'
 
 AUTH_USER_MODEL = 'accounts.Users'
+
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.EmailBackend',
+]

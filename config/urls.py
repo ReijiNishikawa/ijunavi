@@ -19,7 +19,6 @@ from django.urls import path, include
 from ijunavi import views as ijunavi_views
 
 urlpatterns = [
-    path('signup/', ijunavi_views.signup_view, name='signup'),
     path('chat/', ijunavi_views.chat_view, name='chat'),
     path('chat/history/', ijunavi_views.chat_history, name='history'), 
     path('admin/', admin.site.urls),
@@ -27,7 +26,6 @@ urlpatterns = [
     path('mypage/', ijunavi_views.mypage_view, name='mypage'),        # 追加
     path('bookmark/', ijunavi_views.bookmark_view, name='bookmark'),  # 追加
     path('bookmark/remove/', ijunavi_views.bookmark_remove, name='bookmark_remove'),  # 解除
-    path('authtest/', include('authtest.urls')),
-    path('accounts/', include('django.contrib.auth.urls')),
+    path('accounts/', include('accounts.urls')),
 ]
 
