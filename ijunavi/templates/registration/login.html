@@ -13,7 +13,9 @@
             <img src="{% static 'img/image.png' %}" alt="いじゅナビロゴ"  style="max-width: 150px; height: auto; display: block; margin: 0 auto;">
         </div>
         <h1>ログイン</h1>
-        <form action="{% url 'chat' %}" method="get">
+
+        <form action="{% url 'chat' %}" method="post">
+            {% csrf_token %}
             <div class="form-group">
                 <label for="email">メールアドレス</label>
                 <br>
@@ -26,6 +28,7 @@
             </div>
             <button type="submit" class="button login-button">ログイン</button>
         </form>
+
     </div>
 </body>
 </html>
