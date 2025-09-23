@@ -25,5 +25,8 @@ urlpatterns = [
     path('chat/history/', ijunavi_views.chat_history, name='history'), 
     path('admin/', admin.site.urls),
     path('', ijunavi_views.top, name='top'),
+    path('mypage/', ijunavi_views.mypage_view, name='mypage'),        # 追加
+    path('bookmark/', ijunavi_views.bookmark_view, name='bookmark'),  # 追加
+    path('bookmark/remove/', ijunavi_views.bookmark_remove, name='bookmark_remove'),  # 解除
 ]
 
