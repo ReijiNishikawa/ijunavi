@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import ValidationError
+from .forms import SignInForm
 from . import forms
 
 # Create your views here.
@@ -9,9 +10,6 @@ def home(request):
 
 def top(request):
     return render(request, 'ijunavi/top.html', {})
-
-def signup_view(request):
-    return render(request, 'accounts/signup.html', {})
 
 def login_view(request):
     if request.method == "POST":
@@ -28,14 +26,15 @@ def login_view(request):
         
     return render(request, 'accounts/login.html', {})
 
-def signin(request):
-    signin_form = forms.SignInForm(request.POST or None)
-    if signin_form.is_valid():
-        try:
+def signup_view(request):
+    if request.method == 'POST':
+        signin_form = SignInForm(request.POST)
+        if signin_form.is_valid():
             signin_form.save()
             return redirect('home')
-        except ValidationError as e:
-            signin_form.add_error('password', e)
-    return render(request,'ijunavi/signup.html', context={
+    else:
+        signin_form = SignInForm()
+
+    return render(request, 'accounts/signup.html', {
         'signin_form': signin_form,
     })
