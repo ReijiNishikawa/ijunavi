@@ -12,11 +12,15 @@ def top(request):
     return render(request, 'ijunavi/top.html', {})
 
 def login_view(request):
-    if request.method == "POST":
-        email = request.POST.get("email")
-        password = request.POST.get("password")
+    form = LoginForm(request.POST or None)
+    error = None
 
-        user = authenticate(request, email=email, password=password)
+    if request.method == "POST":
+        if form.is_valid():
+            email = form.cleaned_data["email"]
+            password = form.cleaned_data["password"]
+            
+            user = authenticate(request, email=email, password=password)
 
         if user is not None:
             auth_login(request, user)
@@ -24,7 +28,7 @@ def login_view(request):
         else:
             return render(request, "login.html", {"error": "メールまたはパスワードが違います"})
         
-    return render(request, 'accounts/login.html', {})
+    return render(request, 'registration/login.html', {})
 
 def signup_view(request):
     if request.method == 'POST':
