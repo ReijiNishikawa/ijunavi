@@ -1,4 +1,4 @@
-#!/home/iniad/ijunavi/venv/bin/python3
+#!/mnt/c/Users/iniad/Documents/CS_exercise/GitHub/ijunavi/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
