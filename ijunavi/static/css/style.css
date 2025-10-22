@@ -5,7 +5,7 @@ body {
     height: 100vh;
     margin: 0;
     background-color: #e0f2e0; /* 背景色 */
-    font-family: sans-serif;
+    font-family: 'Zen Maru Gothic', sans-serif;
 }
 .container {
     text-align: center;
@@ -61,12 +61,8 @@ h1 {
 .form-div {
     text-align: left;
 }
-input[type="email"],
-input[type="password"] {
+input[type="email"],input[type="password"] {
     width: 100%;
     box-sizing: border-box;
     font-size: 16px;
-}
-body {
-    font-family: 'Zen Maru Gothic', sans-serif;
 }
