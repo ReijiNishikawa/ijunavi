@@ -3,9 +3,15 @@ import random
 from django.http import HttpResponse
 from django.http import Http404
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 
-# 🚨 変更点: rag_service.py から回答生成関数をインポート
+# 🚨 RAGサービスから回答生成関数をインポート
 from . import rag_service 
+
+# accountsアプリからProfileFormをインポート（mainブランチ側の追加）
+from accounts.forms import ProfileForm
+
 
 # Create your views here.
 
@@ -15,8 +21,8 @@ INITIAL_BOT_MESSAGES = [
 ]
 
 QUESTIONS = [
-    {"key": "age",   "ask": "年齢を教えてください（数字のみ）"},
-    {"key": "style",  "ask": "どんな暮らしが理想？（自然 / 都市 / バランス）"},
+    {"key": "age", "ask": "年齢を教えてください（数字のみ）"},
+    {"key": "style", "ask": "どんな暮らしが理想？（自然 / 都市 / バランス）"},
     {"key": "climate", "ask": "好きな気候は？（暖かい / 涼しい / こだわらない）"},
 ]
 
@@ -26,8 +32,6 @@ def _normalize(s: str) -> str:
 def _int_from_text(s: str):
     digits = "".join(c for c in s if c.isdigit())
     return int(digits) if digits else None
-
-# 🚨 変更点: 既存の _recommend 関数を削除し、RAGサービスを呼び出す関数に置き換え
 
 def _get_rag_recommendation(answers):
     """
@@ -45,7 +49,6 @@ def _get_rag_recommendation(answers):
     """
     
     # rag_service.py に定義された回答生成関数を呼び出す
-    # 応答は辞書形式 { "headline": "...", "spots": ["...", "..."] } で返されることを期待
     try:
         recommendation_result = rag_service.generate_recommendation(prompt)
         return recommendation_result
@@ -54,11 +57,11 @@ def _get_rag_recommendation(answers):
         print(f"RAGサービス呼び出しエラー: {e}")
         return {
             "headline": "【エラー】情報取得に失敗しました",
-            "spots": ["システムエラーが発生しました。", "初期の_recommend関数ロジックが使用されます。（仮）"],
+            "spots": ["システムエラーが発生しました。詳細はサーバーログを確認してください。"],
         }
     
-# --- chat_view 以降の関数は変更なし ---
-# ...
+# --- chat_view ---
+
 def chat_view(request):
     chat_active = request.session.get("chat_active", False)
     messages = request.session.get("messages", [])
@@ -69,9 +72,15 @@ def chat_view(request):
     if request.method == "POST":
         action = request.POST.get("action")
 
-        # 開始ロジック (変更なし)
+        # 開始ロジック 
         if action == "start":
-            # ... (中略) ...
+            chat_active = True
+            messages = [{"role": "bot", "text": msg} for msg in INITIAL_BOT_MESSAGES]
+            step = 0
+            messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
+            answers = {}
+            result = None
+            
             request.session.update({
                 "chat_active": chat_active,
                 "messages": messages,
@@ -79,7 +88,7 @@ def chat_view(request):
                 "answers": answers,
                 "result": result,
             })
-            return redirect("chat") # リダイレクトを追加して二重送信を防ぐ（任意）
+            return redirect("chat")
 
         # 送信ロジック
         elif action == "send" and chat_active and step >= 0 and step < len(QUESTIONS):
@@ -88,13 +97,24 @@ def chat_view(request):
                 messages.append({"role": "user", "text": user_msg})
 
                 qkey = QUESTIONS[step]["key"]
-                # ... (入力バリデーションロジック: 変更なし) ...
                 
+                # 年齢のバリデーション (簡易版)
+                if qkey == "age":
+                    age_val = _int_from_text(user_msg)
+                    if age_val is None:
+                        messages.append({"role": "bot", "text": "年齢を数字で入力してください。"})
+                    else:
+                        answers[qkey] = age_val
+                        step += 1
+                else:
+                    answers[qkey] = user_msg
+                    step += 1
+
                 # 次の質問 or 結果表示
                 if step < len(QUESTIONS):
                     messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
                 else:
-                    # 🚨 変更点: RAGサービスから結果を取得
+                    # 🚨 RAGサービスから結果を取得
                     result = _get_rag_recommendation(answers) 
                     messages.append({"role": "bot", "text": "ありがとうございます。条件に合う候補を用意しました。"})
                     step = 100 # 結果表示段階
@@ -102,9 +122,9 @@ def chat_view(request):
                 request.session.update({
                     "messages": messages, "step": step, "answers": answers, "result": result
                 })
-            return redirect("chat") # リダイレクトを追加
+            return redirect("chat")
 
-        # リセットロジック (変更なし)
+        # リセットロジック
         elif action == "reset":
             for k in ("chat_active", "messages", "step", "answers", "result"):
                 if k in request.session:
@@ -119,4 +139,74 @@ def chat_view(request):
         "result": result,
     })
 
-# ... (top, chat_history, mypage_view, bookmark_view, bookmark_remove 関数は変更なし) ...
+# --- mainブランチ側の基本ビュー関数を統合 ---
+
+def top(request):
+    """トップページ"""
+    return render(request, 'ijunavi/top.html')
+
+def chat_history(request):
+    """チャット履歴表示"""
+    messages = request.session.get("messages", [])
+    return render(request, 'ijunavi/history.html', {"messages": messages})
+
+def _get_bookmarks(request):
+    """セッションからブックマーク一覧取得（例データ）"""
+    bms = request.session.get("bookmarks")
+    if bms is None:
+        # 初回は空。動作確認用にサンプルを入れたい場合は下のコメントを外す
+        # bms = [{
+        #   "title": "【地図サムネイル】施設名",
+        #   "address": "住所：東京都○○区…",
+        #   "saved_at": str(timezone.now())[:16],
+        # }]
+        bms = []
+        request.session["bookmarks"] = bms
+    return bms
+
+
+@login_required
+def mypage_view(request):
+    """ログイン中ユーザーのプロフィール表示"""
+    return render(request, 'ijunavi/mypage.html', {
+        "user": request.user,
+    })
+
+
+@login_required
+def profile_edit_view(request):
+    """プロフィール編集"""
+    if request.method == "POST":
+        # request.user が AbstractUser などのカスタムユーザーモデルを継承していることを前提とします
+        form = ProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "プロフィールを更新しました。")
+            return redirect("mypage")
+    else:
+        form = ProfileForm(instance=request.user)
+
+    return render(request, 'ijunavi/profile_edit.html', {
+        "form": form,
+    })
+
+def bookmark_view(request):
+    """ブックマーク一覧"""
+    bookmarks = _get_bookmarks(request)
+    return render(request, 'ijunavi/bookmark.html', {
+        "bookmarks": bookmarks,
+    })
+
+def bookmark_remove(request):
+    """ブックマーク解除（POST: index）"""
+    if request.method == "POST":
+        idx = request.POST.get("index")
+        bookmarks = _get_bookmarks(request)
+        try:
+            i = int(idx)
+            if 0 <= i < len(bookmarks):
+                bookmarks.pop(i)
+                request.session["bookmarks"] = bookmarks
+        except Exception:
+            pass
+    return redirect("bookmark")

@@ -10,40 +10,59 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div id="app">
-  <header>
-    <h1>いじゅナビ</h1>
-    <h2>マイページ</h2>
+<body class="app-page">
+    <div id="app" class="app-shell">
+  <header class="app-header">
+    <div class="app-logo">
+      <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
+    </div>
+    <h1>マイページ</h1>
   </header>
 
-  <main>
-    <section>
-      <pre>
---------------------
-■ プロフィール画像（プレースホルダ）
-　ユーザー名：{{ profile.username }}
+  <main class="app-main">
+    <section class="app-card">
+      {% if messages %}
+        <ul class="message-list">
+          {% for message in messages %}
+            <li class="message-list__item">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <div class="profile-card">
+        <div class="profile-avatar">
+          {% if user.icon %}
+            <img src="{{ user.icon.url }}" alt="プロフィール画像">
+          {% else %}
+            <img src="{% static 'img/image.png' %}" alt="プロフィール画像（未設定）">
+          {% endif %}
+        </div>
+        <div class="profile-info">
+          <dl>
+            <div>
+              <dt>ユーザー名</dt>
+              <dd>{{ user.username|default:"未設定" }}</dd>
+            </div>
+            <div>
+              <dt>メールアドレス</dt>
+              <dd>{{ user.email }}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
 
-メールアドレス：{{ profile.email }}
-
-履歴・実績
-{% for line in history_lines %}
-・{{ line }}
-{% endfor %}
-
-[プロフィール編集]
-[ログアウト]
---------------------
-      </pre>
+      <div class="profile-actions">
+        <a href="{% url 'profile_edit' %}" class="button login-button">プロフィール編集</a>
+        <a href="{% url 'logout' %}" class="button signup-button">ログアウト</a>
+      </div>
     </section>
   </main>
 
-  <footer>
+  <footer class="app-footer">
       <nav aria-label="ボトムタブ">
-        <ul style="list-style:none; padding:0; margin:16px 0; display:flex; justify-content:space-around;">
-          <li><a href="{% url 'chat' %}" aria-current="page">chat</a></li>
-          <li><a href="/mypage/">my page</a></li>
-          <li><a href="/bookmark/">bookmark</a></li>
+        <ul class="bottom-nav">
+          <li><a href="{% url 'chat' %}">chat</a></li>
+          <li><a href="{% url 'mypage' %}" aria-current="page">my page</a></li>
+          <li><a href="{% url 'bookmark' %}">bookmark</a></li>
         </ul>
       </nav>
     </footer>
