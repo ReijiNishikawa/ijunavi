@@ -3,6 +3,8 @@ import random
 from django.http import HttpResponse
 from django.http import Http404
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 
 # Create your views here.
 
@@ -156,18 +158,6 @@ def chat_history(request):
     messages = request.session.get("messages", [])
     return render(request, 'ijunavi/history.html', {"messages": messages})
 
-def _get_profile(request):
-    """セッションからプロフィール取得（なければ仮データ）"""
-    profile = request.session.get("profile")
-    if not profile:
-        profile = {
-            "username": "ユーザー名",
-            "email": "xxx@xx.xx",
-            "image": None,  # 画像は未使用（プレースホルダ）
-        }
-        request.session["profile"] = profile
-    return profile
-
 def _get_bookmarks(request):
     """セッションからブックマーク一覧取得（例データ）"""
     bms = request.session.get("bookmarks")
@@ -182,24 +172,31 @@ def _get_bookmarks(request):
         request.session["bookmarks"] = bms
     return bms
 
+from accounts.forms import ProfileForm
+
+
+@login_required
 def mypage_view(request):
-    """マイページ（表示のみ）"""
-    profile = _get_profile(request)
-
-    # 簡易な「履歴・実績」：チャット履歴の最後2件をサンプル表示
-    chat_msgs = request.session.get("messages", [])
-    history_lines = []
-    if chat_msgs:
-        # 直近2件を抜粋（存在すれば）
-        tail = chat_msgs[-2:] if len(chat_msgs) >= 2 else chat_msgs
-        for m in tail:
-            history_lines.append(f"{m.get('role','')} を保存しました（仮）")
-    else:
-        history_lines.append("履歴はまだありません")
-
+    """ログイン中ユーザーのプロフィール表示"""
     return render(request, 'ijunavi/mypage.html', {
-        "profile": profile,
-        "history_lines": history_lines,
+        "user": request.user,
+    })
+
+
+@login_required
+def profile_edit_view(request):
+    """プロフィール編集"""
+    if request.method == "POST":
+        form = ProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "プロフィールを更新しました。")
+            return redirect("mypage")
+    else:
+        form = ProfileForm(instance=request.user)
+
+    return render(request, 'ijunavi/profile_edit.html', {
+        "form": form,
     })
 
 def bookmark_view(request):
