@@ -1,0 +1,11 @@
+langchain
+langchain-openai
+langchain-community
+langchain-chroma
+pypdf
+tiktoken
+gradio
+python-dotenv
+pandas
+#zipfile
+requests
