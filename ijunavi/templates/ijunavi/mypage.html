@@ -13,10 +13,9 @@
 <body class="app-page">
     <div id="app" class="app-shell">
   <header class="app-header">
-    <div class="app-logo">
+    <div class="app-logo app-logo--small">
       <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
     </div>
-    <h1>マイページ</h1>
   </header>
 
   <main class="app-main">
@@ -29,6 +28,7 @@
         </ul>
       {% endif %}
       <div class="profile-card">
+        <h1 class="profile-title">マイページ</h1>
         <div class="profile-avatar">
           {% if user.icon %}
             <img src="{{ user.icon.url }}" alt="プロフィール画像">
