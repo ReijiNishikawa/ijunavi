@@ -10,40 +10,47 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div id="app">
-  <header>
-    <h1>いじゅナビ</h1>
-    <h2>マイページ</h2>
+<body class="app-page">
+    <div id="app" class="app-shell">
+  <header class="app-header">
+    <div class="app-logo">
+      <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
+    </div>
+    <h1>マイページ</h1>
   </header>
 
-  <main>
-    <section>
-      <pre>
---------------------
-■ プロフィール画像（プレースホルダ）
-　ユーザー名：{{ profile.username }}
+  <main class="app-main">
+    <section class="app-card">
+      <div class="profile-card">
+        <div class="profile-avatar">■ プロフィール画像（プレースホルダ）</div>
+        <div class="profile-info">
+          <p>ユーザー名：{{ profile.username }}</p>
+          <p>メールアドレス：{{ profile.email }}</p>
+        </div>
+      </div>
 
-メールアドレス：{{ profile.email }}
+      <div class="profile-history">
+        <h2>履歴・実績</h2>
+        <ul>
+          {% for line in history_lines %}
+            <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+      </div>
 
-履歴・実績
-{% for line in history_lines %}
-・{{ line }}
-{% endfor %}
-
-[プロフィール編集]
-[ログアウト]
---------------------
-      </pre>
+      <div class="profile-actions">
+        <button type="button" class="button login-button">プロフィール編集</button>
+        <a href="{% url 'logout' %}" class="button signup-button">ログアウト</a>
+      </div>
     </section>
   </main>
 
-  <footer>
+  <footer class="app-footer">
       <nav aria-label="ボトムタブ">
-        <ul style="list-style:none; padding:0; margin:16px 0; display:flex; justify-content:space-around;">
-          <li><a href="{% url 'chat' %}" aria-current="page">chat</a></li>
-          <li><a href="/mypage/">my page</a></li>
-          <li><a href="/bookmark/">bookmark</a></li>
+        <ul class="bottom-nav">
+          <li><a href="{% url 'chat' %}">chat</a></li>
+          <li><a href="{% url 'mypage' %}" aria-current="page">my page</a></li>
+          <li><a href="{% url 'bookmark' %}">bookmark</a></li>
         </ul>
       </nav>
     </footer>

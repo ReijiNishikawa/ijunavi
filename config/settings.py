@@ -127,7 +127,6 @@ LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'top'
 
 AUTH_USER_MODEL = 'accounts.Users'
-USERNAME_FIELD = 'email'
 
 AUTHENTICATION_BACKENDS = [
     'accounts.backends.EmailBackend',
