@@ -7,5 +7,4 @@ tiktoken
 gradio
 python-dotenv
 pandas
-#zipfile
 requests

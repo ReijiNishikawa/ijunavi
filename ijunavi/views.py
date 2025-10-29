@@ -6,6 +6,13 @@ from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
+# 🚨 RAGサービスから回答生成関数をインポート
+from . import rag_service 
+
+# accountsアプリからProfileFormをインポート（mainブランチ側の追加）
+from accounts.forms import ProfileForm
+
+
 # Create your views here.
 
 INITIAL_BOT_MESSAGES = [
@@ -14,8 +21,8 @@ INITIAL_BOT_MESSAGES = [
 ]
 
 QUESTIONS = [
-    {"key": "age",     "ask": "年齢を教えてください（数字のみ）"},
-    {"key": "style",   "ask": "どんな暮らしが理想？（自然 / 都市 / バランス）"},
+    {"key": "age", "ask": "年齢を教えてください（数字のみ）"},
+    {"key": "style", "ask": "どんな暮らしが理想？（自然 / 都市 / バランス）"},
     {"key": "climate", "ask": "好きな気候は？（暖かい / 涼しい / こだわらない）"},
 ]
 
@@ -26,74 +33,54 @@ def _int_from_text(s: str):
     digits = "".join(c for c in s if c.isdigit())
     return int(digits) if digits else None
 
-def _recommend(answers):
+def _get_rag_recommendation(answers):
+    """
+    RAGサービスを呼び出し、ユーザーの回答に基づいて移住先を提案する。
+    """
     age = answers.get("age")
-    style = answers.get("style", "").lower()
-    climate = answers.get("climate", "").lower()
+    style = answers.get("style", "")
+    climate = answers.get("climate", "")
 
-    # ベース候補
-    if "自然" in style or "nature" in style:
-        if "涼" in climate:
-            city = ("長野県", "松本市")
-        elif "暖" in climate:
-            city = ("宮崎県", "日南市")
-        else:
-            city = ("長野県", "安曇野市")
-    elif "都市" in style or "city" in style:
-        if "涼" in climate:
-            city = ("北海道", "札幌市")
-        elif "暖" in climate:
-            city = ("福岡県", "福岡市")
-        else:
-            city = ("神奈川県", "横浜市")
-    else:  # バランス
-        if "涼" in climate:
-            city = ("石川県", "金沢市")
-        elif "暖" in climate:
-            city = ("香川県", "高松市")
-        else:
-            city = ("宮城県", "仙台市")
-
-    # 年齢による微調整（ゆるく）
-    if isinstance(age, int):
-        if age <= 25 and city[1] not in ("福岡市", "札幌市", "仙台市", "横浜市"):
-            city = ("福岡県", "福岡市")
-        if age >= 60 and ("都市" in style or "city" in style):
-            city = ("静岡県", "三島市")
-
-    # 簡易的な周辺施設サンプル
-    spots = [
-        "周辺の施設",
-        "・スーパー / 病院 / 図書館",
-        "・市民センター / 公園",
-        "・主要駅（バス連携あり）",
-    ]
-    return {
-        "pref": city[0],
-        "city": city[1],
-        "headline": f"{city[0]}{city[1]}の情報",
-        "spots": spots,
-    }
+    # ユーザーの回答を統合したプロンプトを作成
+    prompt = f"""
+    私の年齢は{age}歳です。
+    理想の暮らしは「{style}」で、好きな気候は「{climate}」です。
+    これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
+    """
+    
+    # rag_service.py に定義された回答生成関数を呼び出す
+    try:
+        recommendation_result = rag_service.generate_recommendation(prompt)
+        return recommendation_result
+    except Exception as e:
+        # RAGサービスが失敗した場合のフォールバック
+        print(f"RAGサービス呼び出しエラー: {e}")
+        return {
+            "headline": "【エラー】情報取得に失敗しました",
+            "spots": ["システムエラーが発生しました。詳細はサーバーログを確認してください。"],
+        }
+    
+# --- chat_view ---
 
 def chat_view(request):
     chat_active = request.session.get("chat_active", False)
     messages = request.session.get("messages", [])
-    step = request.session.get("step", -1)  # -1:未開始, 0..質問index, 100:結果表示
+    step = request.session.get("step", -1) # -1:未開始, 0..質問index, 100:結果表示
     answers = request.session.get("answers", {})
     result = request.session.get("result")
 
     if request.method == "POST":
         action = request.POST.get("action")
 
-        # 開始
+        # 開始ロジック 
         if action == "start":
             chat_active = True
-            messages = []
-            for m in INITIAL_BOT_MESSAGES:
-                messages.append({"role": "bot", "text": m})
-            messages.append({"role": "bot", "text": QUESTIONS[0]["ask"]})
+            messages = [{"role": "bot", "text": msg} for msg in INITIAL_BOT_MESSAGES]
             step = 0
-            answers, result = {}, None
+            messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
+            answers = {}
+            result = None
+            
             request.session.update({
                 "chat_active": chat_active,
                 "messages": messages,
@@ -101,42 +88,43 @@ def chat_view(request):
                 "answers": answers,
                 "result": result,
             })
+            return redirect("chat")
 
-        # 送信
+        # 送信ロジック
         elif action == "send" and chat_active and step >= 0 and step < len(QUESTIONS):
             user_msg = _normalize(request.POST.get("message"))
             if user_msg:
                 messages.append({"role": "user", "text": user_msg})
 
                 qkey = QUESTIONS[step]["key"]
-                # 入力バリデーション
+                
+                # 年齢のバリデーション (簡易版)
                 if qkey == "age":
-                    val = _int_from_text(user_msg)
-                    if val is None:
-                        messages.append({"role": "bot", "text": "すみません、数字で年齢を教えてください。"})
+                    age_val = _int_from_text(user_msg)
+                    if age_val is None:
+                        messages.append({"role": "bot", "text": "年齢を数字で入力してください。"})
                     else:
-                        answers["age"] = val
+                        answers[qkey] = age_val
                         step += 1
-                elif qkey == "style":
-                    answers["style"] = user_msg
-                    step += 1
-                elif qkey == "climate":
-                    answers["climate"] = user_msg
+                else:
+                    answers[qkey] = user_msg
                     step += 1
 
                 # 次の質問 or 結果表示
                 if step < len(QUESTIONS):
                     messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
                 else:
-                    result = _recommend(answers)
+                    # 🚨 RAGサービスから結果を取得
+                    result = _get_rag_recommendation(answers) 
                     messages.append({"role": "bot", "text": "ありがとうございます。条件に合う候補を用意しました。"})
-                    step = 100  # 結果表示段階
+                    step = 100 # 結果表示段階
 
                 request.session.update({
                     "messages": messages, "step": step, "answers": answers, "result": result
                 })
+            return redirect("chat")
 
-        # リセット
+        # リセットロジック
         elif action == "reset":
             for k in ("chat_active", "messages", "step", "answers", "result"):
                 if k in request.session:
@@ -151,10 +139,14 @@ def chat_view(request):
         "result": result,
     })
 
+# --- mainブランチ側の基本ビュー関数を統合 ---
+
 def top(request):
+    """トップページ"""
     return render(request, 'ijunavi/top.html')
 
 def chat_history(request):
+    """チャット履歴表示"""
     messages = request.session.get("messages", [])
     return render(request, 'ijunavi/history.html', {"messages": messages})
 
@@ -172,8 +164,6 @@ def _get_bookmarks(request):
         request.session["bookmarks"] = bms
     return bms
 
-from accounts.forms import ProfileForm
-
 
 @login_required
 def mypage_view(request):
@@ -187,6 +177,7 @@ def mypage_view(request):
 def profile_edit_view(request):
     """プロフィール編集"""
     if request.method == "POST":
+        # request.user が AbstractUser などのカスタムユーザーモデルを継承していることを前提とします
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
