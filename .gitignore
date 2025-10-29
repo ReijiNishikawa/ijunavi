@@ -1,3 +1,20 @@
+# SQLite DB
+db.sqlite3
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+
+# VSCode settings
+.vscode/
+
+# Log files
+*.log
 
 # SQLite DB
 db.sqlite3
