@@ -16,6 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from ijunavi import views as ijunavi_views
 
 urlpatterns = [
@@ -24,8 +26,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', ijunavi_views.top, name='top'),
     path('mypage/', ijunavi_views.mypage_view, name='mypage'),        # 追加
+    path('mypage/edit/', ijunavi_views.profile_edit_view, name='profile_edit'),
     path('bookmark/', ijunavi_views.bookmark_view, name='bookmark'),  # 追加
     path('bookmark/remove/', ijunavi_views.bookmark_remove, name='bookmark_remove'),  # 解除
     path('accounts/', include('accounts.urls')),
 ]
 
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

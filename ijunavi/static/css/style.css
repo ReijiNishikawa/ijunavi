@@ -254,15 +254,37 @@ input[type="email"],input[type="password"] {
     margin-bottom: 16px;
 }
 .profile-avatar {
-    margin-bottom: 12px;
-    padding: 12px;
-    border: 1px dashed #bcd9bc;
-    border-radius: 10px;
-    background-color: #f6fff6;
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.profile-avatar img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #b9e3b9;
+    background-color: #ffffff;
+}
+.profile-avatar--small img {
+    width: 80px;
+    height: 80px;
+    border-width: 2px;
 }
 .profile-info p {
     margin: 4px 0;
+}
+.profile-info dl {
+    margin: 0;
+}
+.profile-info dt {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #2f7d32;
+}
+.profile-info dd {
+    margin: 0 0 12px;
 }
 .profile-history h2 {
     margin: 16px 0 8px;
@@ -287,6 +309,39 @@ input[type="email"],input[type="password"] {
     margin: 0;
     text-align: center;
     box-sizing: border-box;
+}
+
+.profile-edit-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+.profile-edit-form input[type="text"],
+.profile-edit-form input[type="email"],
+.profile-edit-form input[type="file"] {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #cde4cd;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.message-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.message-list__item {
+    background-color: #dff0d8;
+    border: 1px solid #bcd9bc;
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: #2f7d32;
+    font-size: 0.95rem;
 }
 
 @media (max-width: 600px) {

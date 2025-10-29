@@ -21,25 +21,37 @@
 
   <main class="app-main">
     <section class="app-card">
+      {% if messages %}
+        <ul class="message-list">
+          {% for message in messages %}
+            <li class="message-list__item">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
       <div class="profile-card">
-        <div class="profile-avatar">■ プロフィール画像（プレースホルダ）</div>
+        <div class="profile-avatar">
+          {% if user.icon %}
+            <img src="{{ user.icon.url }}" alt="プロフィール画像">
+          {% else %}
+            <img src="{% static 'img/image.png' %}" alt="プロフィール画像（未設定）">
+          {% endif %}
+        </div>
         <div class="profile-info">
-          <p>ユーザー名：{{ profile.username }}</p>
-          <p>メールアドレス：{{ profile.email }}</p>
+          <dl>
+            <div>
+              <dt>ユーザー名</dt>
+              <dd>{{ user.username|default:"未設定" }}</dd>
+            </div>
+            <div>
+              <dt>メールアドレス</dt>
+              <dd>{{ user.email }}</dd>
+            </div>
+          </dl>
         </div>
       </div>
 
-      <div class="profile-history">
-        <h2>履歴・実績</h2>
-        <ul>
-          {% for line in history_lines %}
-            <li>{{ line }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-
       <div class="profile-actions">
-        <button type="button" class="button login-button">プロフィール編集</button>
+        <a href="{% url 'profile_edit' %}" class="button login-button">プロフィール編集</a>
         <a href="{% url 'logout' %}" class="button signup-button">ログアウト</a>
       </div>
     </section>
