@@ -25,11 +25,11 @@ urlpatterns = [
     path('chat/history/', ijunavi_views.chat_history, name='history'), 
     path('admin/', admin.site.urls),
     path('', ijunavi_views.top, name='top'),
-    path('mypage/', ijunavi_views.mypage_view, name='mypage'),        # 追加
+    path('mypage/', ijunavi_views.mypage_view, name='mypage'), 
     path('mypage/edit/', ijunavi_views.profile_edit_view, name='profile_edit'),
-    path('bookmark/', ijunavi_views.bookmark_view, name='bookmark'),  # 追加
+    path('bookmark/', ijunavi_views.bookmark_view, name='bookmark'), 
     path('bookmark/add/', ijunavi_views.bookmark_add, name='bookmark_add'), 
-    path('bookmark/remove/', ijunavi_views.bookmark_remove, name='bookmark_remove'),  # 解除
+    path('bookmark/remove/<int:pk>/', ijunavi_views.bookmark_remove, name='bookmark_remove'),
     path('accounts/', include('accounts.urls')),
 ]
 

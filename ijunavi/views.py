@@ -11,7 +11,8 @@ from . import rag_service
 
 # accountsアプリからProfileFormをインポート（mainブランチ側の追加）
 from accounts.forms import ProfileForm
-
+from django.views.decorators.http import require_POST
+from .models import Bookmark
 
 # Create your views here.
 
@@ -150,20 +151,6 @@ def chat_history(request):
     messages = request.session.get("messages", [])
     return render(request, 'ijunavi/history.html', {"messages": messages})
 
-def _get_bookmarks(request):
-    """セッションからブックマーク一覧取得（例データ）"""
-    bms = request.session.get("bookmarks")
-    if bms is None:
-        # 初回は空。動作確認用にサンプルを入れたい場合は下のコメントを外す
-        # bms = [{
-        #   "title": "【地図サムネイル】施設名",
-        #   "address": "住所：東京都○○区…",
-        #   "saved_at": str(timezone.now())[:16],
-        # }]
-        bms = []
-        request.session["bookmarks"] = bms
-    return bms
-
 
 @login_required
 def mypage_view(request):
@@ -191,46 +178,39 @@ def profile_edit_view(request):
     })
 
 def bookmark_view(request):
-    """ブックマーク一覧"""
-    bookmarks = _get_bookmarks(request)
-    return render(request, 'ijunavi/bookmark.html', {
-        "bookmarks": bookmarks,
-    })
+    qs = Bookmark.objects.filter(user=request.user).order_by("-created_at")
+    return render(request, 'ijunavi/bookmark.html', {"bookmarks": qs})
 
-def bookmark_remove(request):
-    """ブックマーク解除（POST: index）"""
-    if request.method == "POST":
-        idx = request.POST.get("index")
-        bookmarks = _get_bookmarks(request)
-        try:
-            i = int(idx)
-            if 0 <= i < len(bookmarks):
-                bookmarks.pop(i)
-                request.session["bookmarks"] = bookmarks
-        except Exception:
-            pass
+@require_POST
+@login_required
+def bookmark_remove(request, pk: int):
+    try:
+        bm = Bookmark.objects.get(pk=pk, user=request.user)
+    except Bookmark.DoesNotExist:
+        messages.error(request, "対象のブックマークが見つかりません。")
+        return redirect("bookmark")
+    bm.delete()
+    messages.success(request, "ブックマークを削除しました。")
     return redirect("bookmark")
 
+@require_POST
+@login_required
 def bookmark_add(request):
-    """ブックマーク追加（POST）"""
-    if request.method == "POST":
-        title = request.POST.get("title", "").strip()
-        address = request.POST.get("address", "").strip()
-        detail_url = request.POST.get("detail_url", "").strip()
+    title = (request.POST.get("title") or "").strip()
+    address = (request.POST.get("address") or "").strip()
+    detail_url = (request.POST.get("detail_url") or "").strip()
 
-        if not title:
-            # タイトルがない場合は無視
-            return redirect("bookmark")
-
-        bookmarks = _get_bookmarks(request)
-        bookmarks.append({
-            "title": title or "(タイトル未設定)",
-            "address": address or "",
-            "detail_url": detail_url or "",
-            "saved_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
-        })
-        request.session["bookmarks"] = bookmarks
-        request.session.modified = True
+    if not title:
+        messages.warning(request, "タイトルが空のため保存しませんでした。")
         return redirect("bookmark")
+
+    # 重複防止（同一内容は1件に）
+    _, created = Bookmark.objects.get_or_create(
+        user=request.user, title=title, address=address, detail_url=detail_url
+    )
+    if created:
+        messages.success(request, "ブックマークに保存しました。")
+    else:
+        messages.info(request, "同じ内容のブックマークがすでに存在します。")
     return redirect("bookmark")
 
