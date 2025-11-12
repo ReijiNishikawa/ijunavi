@@ -1,6 +1,11 @@
 django
-langchain==0.1.16
-chromadb==0.4.14
+langchain==0.3.25
+langchain-core==0.3.63
+langchain-community==0.3.7
+langchain-text-splitters==0.3.8
+langchain-openai==0.3.19
+langchain-chroma==0.1.4
+chromadb==0.5.23
 pypdf
 tiktoken
 python-dotenv
