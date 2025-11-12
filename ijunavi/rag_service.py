@@ -10,13 +10,12 @@ import traceback
 # 注: `langchain_community.document_loaders`と`langchain_chroma`は通常、
 # 古いバージョンでは`langchain.document_loaders`等に属する可能性がありますが、
 # 最新のLangChainの規約に従い、コミュニティ版としてインポートします。
-from langchain.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
-from langchain.vectorstores import Chroma
-from langchain.chains import RetrievalQA
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_chroma import Chroma
 from langchain.prompts import PromptTemplate
+from langchain.chains import RetrievalQA
 
 # 環境変数をロード (APIキーなど)
 # Django起動時に読み込まれることを想定
