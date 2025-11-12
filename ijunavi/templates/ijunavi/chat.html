@@ -53,7 +53,16 @@
               </div>
               <div class="chat-spots">
                 {% for line in result.spots %}
-                  <div>{{ line }}</div>
+                  <div class="spot-row" style="display:flex; gap:.5rem; align-items:center; justify-content:space-between;">
+                    <div>{{ line }}</div>
+                    <form method="post" action="{% url 'bookmark_add' %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="title" value="{{ line }}">
+                      <input type="hidden" name="address" value="">
+                      <input type="hidden" name="detail_url" value="">
+                      <button type="submit" class="button login-button">ブックマーク</button>
+                    </form>
+                  </div>
                 {% endfor %}
               </div>
               <p class="chat-link">

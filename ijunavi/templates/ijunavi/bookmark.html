@@ -32,9 +32,8 @@
 保存日時：{{ bm.saved_at|default:"（未記録）" }}
 [詳細]
               </pre>
-              <form method="post" action="{% url 'bookmark_remove' %}" class="bookmark-form">
+              <form method="post" action="{% url 'bookmark_remove' bm.pk %}" class="bookmark-form">
                 {% csrf_token %}
-                <input type="hidden" name="index" value="{{ forloop.counter0 }}">
                 <button type="submit" class="button signup-button">ブックマーク解除</button>
               </form>
             </li>
