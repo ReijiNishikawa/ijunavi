@@ -23,8 +23,8 @@ load_dotenv()
 
 # === 設定 ===
 # Djangoプロジェクトのルートディレクトリから見た相対パスとして定義
-DATA_DIR = Path("./data/rag_handson/data")
-DB_DIR = Path("./chroma_db/migration")
+DATA_DIR = Path("../data/rag_handson/data")
+DB_DIR = Path("../chroma_db/migration")
 ZIP_PATH = "./rag_handson.zip"
 EXTRACT_DIR = "./rag_handson"
 
