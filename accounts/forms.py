@@ -28,3 +28,26 @@ class SignInForm(forms.ModelForm):
 class LoginForm(forms.Form):
     email = forms.EmailField(label="メールアドレス")
     password = forms.CharField(label="パスワード", widget=forms.PasswordInput)
+
+class ProfileForm(forms.ModelForm):
+    class Meta:
+        model = Users
+        fields = ('username', 'email', 'icon')
+        labels = {
+            'username': 'ユーザー名',
+            'email': 'メールアドレス',
+            'icon': 'プロフィール画像',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['icon'].required = False
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if not email:
+            return email
+        qs = Users.objects.exclude(pk=self.instance.pk).filter(email=email)
+        if qs.exists():
+            raise forms.ValidationError('このメールアドレスは既に使用されています。')
+        return email
