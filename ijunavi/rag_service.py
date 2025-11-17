@@ -15,7 +15,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter # 修正点:
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_core.prompts import PromptTemplate # 修正点: langchain.prompts -> langchain_core.prompts
-#from langchain import RetrievalQA
+from langchain.chain import RetrievalQA
 
 # 環境変数をロード (APIキーなど)
 # Django起動時に読み込まれることを想定
