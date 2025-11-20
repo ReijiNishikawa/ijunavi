@@ -11,11 +11,11 @@ import traceback
 # 古いバージョンでは`langchain.document_loaders`等に属する可能性がありますが、
 # 最新のLangChainの規約に従い、コミュニティ版としてインポートします。
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter # 修正点: langchain -> langchain_text_splitters
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
-from langchain_core.prompts import PromptTemplate # 修正点: langchain.prompts -> langchain_core.prompts
-from langchain.chain import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain.chains import RetrievalQA
 
 # 環境変数をロード (APIキーなど)
 # Django起動時に読み込まれることを想定
@@ -24,7 +24,7 @@ load_dotenv()
 # === 設定 ===
 # Djangoプロジェクトのルートディレクトリから見た相対パスとして定義
 DATA_DIR = Path("../data/rag_handson/data")
-DB_DIR = Path("../chroma_db/migration")
+DB_DIR = Path("./chroma_db/migration")
 ZIP_PATH = "./rag_handson.zip"
 EXTRACT_DIR = "./rag_handson"
 
@@ -113,10 +113,14 @@ def load_and_split_documents():
     return chunks
 
 def initialize_vectorstore(chunks):
-    """
-    ベクトルストアの初期化またはロード
-    """
-    embeddings = OpenAIEmbeddings()
+    # キーを環境変数から取得
+    openai_key = os.getenv("OPENAI_API_KEY") 
+    
+    # ★修正箇所：EmbeddingsにもカスタムURLとキーを渡す★
+    embeddings = OpenAIEmbeddings(
+        openai_api_key=openai_key, 
+        openai_api_base="https://api.openai.iniad.org/api/v1"
+    )
     
     if DB_DIR.exists() and any(DB_DIR.iterdir()):
         print("RAG: 既存のベクトルDBをロードします。")
@@ -152,17 +156,64 @@ def initialize_vectorstore(chunks):
 
     return vectorstore
 
+#def setup_qa_chain(vectorstore):
+    """
+    RetrievalQAチェーンのセットアップ
+    """
+    #try:
+        #llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.0)
+        #retriever = vectorstore.as_retriever(search_kwargs={"k": 5}) # 関連性の高い上位5件を検索
+
+        #template = """あなたは地方移住の専門家です。
+        #提供されたコンテキスト情報とあなたの知識を使って、ユーザーの地方移住に関する質問に親切かつ具体的に答えてください。
+        #提案する地域は、コンテキスト内の情報に基づいてください。
+        #コンテキストに情報がない場合は、「情報が不足しているため、具体的な提案ができません。他の質問をお願いします。」と答えてください。
+        #回答は簡潔にし、まず最も推奨する地域名とその理由を述べ、次に詳細情報を提供してください。
+
+        #コンテキスト:
+        #{context}
+
+        #質問:
+        #{question}
+        #"""
+
+        #prompt = PromptTemplate.from_template(template)
+
+        #qa_chain_instance = RetrievalQA.from_chain_type(
+            #llm=llm,
+            #retriever=retriever,
+            #chain_type="stuff",
+            #chain_type_kwargs={"prompt": prompt},
+            #return_source_documents=True
+        
+        #return qa_chain_instance
+    #except Exception as e:
+        #print(f"RAG: QAチェーンのセットアップに失敗しました。OpenAI APIキーを確認してください。エラー: {e}")
+        #return None
 def setup_qa_chain(vectorstore):
     """
     RetrievalQAチェーンのセットアップ
     """
     try:
-        llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.0)
+        # 環境変数からキーを読み込む
+        openai_key = os.getenv("OPENAI_API_KEY") 
+        if not openai_key:
+            raise ValueError("OPENAI_API_KEYが環境変数に設定されていません。")
+
+        # ★LLMの初期化を教授の指示通りに変更★
+        llm = ChatOpenAI(
+            openai_api_key=openai_key, 
+            openai_api_base="https://api.openai.iniad.org/api/v1",
+            model_name="gpt-4o-mini", 
+            temperature=0.0
+        )
+        
         retriever = vectorstore.as_retriever(search_kwargs={"k": 5}) # 関連性の高い上位5件を検索
 
         template = """あなたは地方移住の専門家です。
         提供されたコンテキスト情報とあなたの知識を使って、ユーザーの地方移住に関する質問に親切かつ具体的に答えてください。
         提案する地域は、コンテキスト内の情報に基づいてください。
+        また提案する地域は県名ではなく少なくとも市単位にしてください。
         コンテキストに情報がない場合は、「情報が不足しているため、具体的な提案ができません。他の質問をお願いします。」と答えてください。
         回答は簡潔にし、まず最も推奨する地域名とその理由を述べ、次に詳細情報を提供してください。
 
@@ -175,6 +226,7 @@ def setup_qa_chain(vectorstore):
 
         prompt = PromptTemplate.from_template(template)
 
+        
         qa_chain_instance = RetrievalQA.from_chain_type(
             llm=llm,
             retriever=retriever,
@@ -184,7 +236,7 @@ def setup_qa_chain(vectorstore):
         )
         return qa_chain_instance
     except Exception as e:
-        print(f"RAG: QAチェーンのセットアップに失敗しました。OpenAI APIキーを確認してください。エラー: {e}")
+        print(f"RAG: QAチェーンのセットアップに失敗しました。エラー: {e}")
         return None
 
 def initialize_rag():
