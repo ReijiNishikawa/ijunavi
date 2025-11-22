@@ -19,7 +19,7 @@ from langchain.chains import RetrievalQA
 
 # 環境変数をロード (APIキーなど)
 # Django起動時に読み込まれることを想定
-load_dotenv()
+load_dotenv("ijunavi/templates/.env")
 
 # === 設定 ===
 # Djangoプロジェクトのルートディレクトリから見た相対パスとして定義
