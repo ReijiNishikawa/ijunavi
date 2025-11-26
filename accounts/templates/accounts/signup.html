@@ -36,6 +36,20 @@
                 {{ signin_form.confirm_password }}
                 {{ signin_form.confirm_password.errors }}
             </div>
+            
+            <div>
+                {{ signin_form.password1.label_tag }}
+                {{ signin_form.password1 }}
+
+                {% if signin_form.password1.errors %}
+                    <div style="color:red;">
+                        {% for error in signin_form.password1.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
             <button type="submit" class="button signup-button">新規登録</button>
         </form>
     </div>
