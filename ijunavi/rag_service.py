@@ -19,14 +19,16 @@ from langchain.chains import RetrievalQA
 
 # 環境変数をロード (APIキーなど)
 # Django起動時に読み込まれることを想定
-load_dotenv("ijunavi/templates/.env")
+# Djangoプロジェクトのルートディレクトリ（manage.py がある場所）
+load_dotenv()
 
-# === 設定 ===
-# Djangoプロジェクトのルートディレクトリから見た相対パスとして定義
-DATA_DIR = Path("../data/rag_handson/data")
-DB_DIR = Path("./chroma_db/migration")
-ZIP_PATH = "./rag_handson.zip"
-EXTRACT_DIR = "./rag_handson"
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 設定 ーーー
+DATA_DIR = BASE_DIR / "rag_handson"          # ★ここを修正
+DB_DIR   = BASE_DIR / ".chroma_db" / "migration"
+ZIP_PATH = BASE_DIR / "rag_handson.zip"
+EXTRACT_DIR = BASE_DIR / "rag_handson"
 
 # グローバル変数としてQAチェーンを保持 (シングルトンパターン)
 qa_chain = None
