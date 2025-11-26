@@ -19,7 +19,7 @@ from langchain.chains import RetrievalQA
 
 # 環境変数をロード (APIキーなど)
 # Django起動時に読み込まれることを想定
-load_dotenv()
+load_dotenv("ijunavi/templates/.env")
 
 # === 設定 ===
 # Djangoプロジェクトのルートディレクトリから見た相対パスとして定義
@@ -241,7 +241,7 @@ def setup_qa_chain(vectorstore):
 
 def initialize_rag():
     """
-    RAGチェーンを初期化し、グローバル変数にセットする（一度だけ実行）。
+    RAGチェーンを初期化し、グローバル変数にセットする(一度だけ実行）。
     """
     global qa_chain
     if qa_chain is not None:
@@ -272,7 +272,7 @@ def generate_recommendation(prompt: str) -> dict:
         prompt (str): ユーザーの質問と条件をまとめたテキスト。
         
     Returns:
-        dict: 推薦結果の構造化されたデータ（chat.htmlのresult変数に対応）。
+        dict: 推薦結果の構造化されたデータ(chat.htmlのresult変数に対応)。
     """
     global qa_chain
     
