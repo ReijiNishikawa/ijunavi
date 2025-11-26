@@ -30,6 +30,10 @@ class Users(AbstractBaseUser, PermissionsMixin):
     icon = models.FileField(null=True, upload_to="icon/")
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    
+    verification_token = models.UUIDField(null=True, blank=True)
+    token_created_at = models.DateTimeField(null=True, blank=True)
+    is_verified = models.BooleanField(default=False)
 
     # ここを UserManager → UsersManager に変更！
     objects = UsersManager()

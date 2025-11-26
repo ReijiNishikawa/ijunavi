@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <title>パスワード再設定完了</title>
+</head>
+
+<body>
+    {% extends "admin/base.html" %}
+    {% load static %}
+
+    {% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'admin/custom.css' %}">
+    {% endblock %}
+
+</body>
+</html>
