@@ -24,7 +24,9 @@ QUESTIONS = [
     {"key": "age", "ask": "年齢を教えてください（数字のみ）"},
     {"key": "style", "ask": "どんな暮らしが理想？（自然 / 都市 / バランス）"},
     {"key": "climate", "ask": "好きな気候は？（暖かい / 涼しい / こだわらない）"},
-]
+    {"key":"family","ask":"家族構成は？"},
+    {"key":"else","ask":"その他の条件を入力してください"},
+    ]
 
 def _normalize(s: str) -> str:
     return (s or "").strip()
@@ -40,11 +42,14 @@ def _get_rag_recommendation(answers):
     age = answers.get("age")
     style = answers.get("style", "")
     climate = answers.get("climate", "")
-
+    family =answers.get("family","")
+    a_else =answers.get("else","")
     # ユーザーの回答を統合したプロンプトを作成
     prompt = f"""
     私の年齢は{age}歳です。
+    家族構成は{family}です。
     理想の暮らしは「{style}」で、好きな気候は「{climate}」です。
+    また{a_else}も考慮してください。
     これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
     """
     
