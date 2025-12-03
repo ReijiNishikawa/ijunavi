@@ -43,13 +43,14 @@
               <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
                 {% csrf_token %}
                 <input type="hidden" name="title" value="{{ result.headline }}">
-                <input type="hidden" name="address" value="">
+                <input type="hidden" name="address" value="{{ result.map_address|default:result.headline }}">
                 <input type="hidden" name="detail_url" value="">
                 <button type="submit" class="button signup-button">この提案をブックマーク</button>
               </form>
               <div class="chat-map">
-                <p>[ 地図表示（プレースホルダ） ]</p>
-                <p>※地図やピンはCSS/画像を追加すると再現できます</p>
+                <div id="result-map"
+                    data-address="{{ result.map_address|default:result.headline }}">
+                </div>
               </div>
               <div class="chat-spots">
                 {% for line in result.spots %}
@@ -113,5 +114,53 @@
     </footer>
 
   </div>
+<script>
+  function initMap() {
+    const mapElement = document.getElementById("result-map");
+    if (!mapElement) return;
+
+    // Django から埋め込んだ住所（例：南城市（沖縄県））
+    const address = mapElement.dataset.address;
+
+    // とりあえずの初期位置（東京駅あたり）
+    const defaultCenter = { lat: 35.681236, lng: 139.767125 };
+
+    const map = new google.maps.Map(mapElement, {
+      center: defaultCenter,
+      zoom: 6,
+    });
+
+    if (!address) {
+      console.warn("住所が指定されていません");
+      return;
+    }
+
+    const geocoder = new google.maps.Geocoder();
+
+    geocoder.geocode({ address: address }, function(results, status) {
+      if (status === "OK" && results[0]) {
+        const loc = results[0].geometry.location;
+        map.setCenter(loc);
+        map.setZoom(11);
+
+        new google.maps.Marker({
+          map: map,
+          position: loc,
+          title: address,
+        });
+      } else {
+        console.error("Geocode failed: " + status);
+      }
+    });
+  }
+</script>
+
+<!-- ★ここを必ずこの形にする -->
+<script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGXd3I891Z_bk821cyKVx4o70AIan45L0&callback=initMap"
+  async
+  defer
+></script>
+
 </body>
 </html>

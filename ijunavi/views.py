@@ -5,6 +5,7 @@ from django.http import Http404
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+import re
 
 # 🚨 RAGサービスから回答生成関数をインポート
 from . import rag_service 
@@ -42,9 +43,9 @@ def _get_rag_recommendation(answers):
     age = answers.get("age")
     style = answers.get("style", "")
     climate = answers.get("climate", "")
-    family =answers.get("family","")
-    a_else =answers.get("else","")
-    # ユーザーの回答を統合したプロンプトを作成
+    family = answers.get("family", "")
+    a_else = answers.get("else", "")
+
     prompt = f"""
     私の年齢は{age}歳です。
     家族構成は{family}です。
@@ -52,17 +53,24 @@ def _get_rag_recommendation(answers):
     また{a_else}も考慮してください。
     これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
     """
-    
-    # rag_service.py に定義された回答生成関数を呼び出す
+
     try:
         recommendation_result = rag_service.generate_recommendation(prompt)
+
+        # ★ここで見出しから住所を抽出して result に追加
+        headline = recommendation_result.get("headline", "")
+        map_address = extract_address_from_headline(headline)
+        recommendation_result["map_address"] = map_address
+
         return recommendation_result
+
     except Exception as e:
-        # RAGサービスが失敗した場合のフォールバック
         print(f"RAGサービス呼び出しエラー: {e}")
+        headline = "【エラー】情報取得に失敗しました"
         return {
-            "headline": "【エラー】情報取得に失敗しました",
+            "headline": headline,
             "spots": ["システムエラーが発生しました。詳細はサーバーログを確認してください。"],
+            "map_address": extract_address_from_headline(headline),
         }
     
 # --- chat_view ---
@@ -239,3 +247,38 @@ def bookmark_add(request):
         return redirect("bookmark")
     return redirect("bookmark")
 
+
+def extract_address_from_headline(headline: str) -> str:
+    """
+    RAG の見出しテキストから地図用の住所を取り出す。
+    例:
+      最も推奨する地域は「南城市（沖縄県）」です。
+      → 沖縄県南城市
+    """
+
+    if not headline:
+        return ""
+
+    # まず「〜」の中身を取る
+    m = re.search(r'「(.+?)」', headline)
+    if m:
+        name = m.group(1)  # 例: '南城市（沖縄県）'
+        name = name.strip()
+
+        # 「市（県）」のようなパターンを分解
+        m2 = re.match(r'(.+)[(（](.+?)[)）]', name)
+        if m2:
+            city = m2.group(1).strip()   # 南城市
+            pref = m2.group(2).strip()   # 沖縄県
+            return f"{pref}{city}"       # 沖縄県南城市
+
+        # かっこが無ければそのまま住所として使う
+        return name
+
+    # 「」が無い場合は「○○県○○市」パターンを探す
+    m = re.search(r'(..[都道府県].+?[市区町村])', headline)
+    if m:
+        return m.group(1).strip()
+
+    # 何も取れなかったら、念のため全文を返す
+    return headline.strip()
