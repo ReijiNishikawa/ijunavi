@@ -25,7 +25,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 設定 ーーー
-DATA_DIR = BASE_DIR / "rag_handson"          # ★ここを修正
+DATA_DIR = BASE_DIR / "./rag_handson/data"          # ★ここを修正
 DB_DIR   = BASE_DIR / ".chroma_db" / "migration"
 ZIP_PATH = BASE_DIR / "rag_handson.zip"
 EXTRACT_DIR = BASE_DIR / "rag_handson"
