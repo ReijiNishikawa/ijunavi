@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from ijunavi import views as ijunavi_views
+from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('chat/', ijunavi_views.chat_view, name='chat'),
@@ -30,7 +31,9 @@ urlpatterns = [
     path('bookmark/', ijunavi_views.bookmark_view, name='bookmark'),  # 追加
     path('bookmark/add/', ijunavi_views.bookmark_add, name='bookmark_add'), 
     path('bookmark/remove/', ijunavi_views.bookmark_remove, name='bookmark_remove'),  # 解除
+    
     path('accounts/', include('accounts.urls')),
+    path('logout/', auth_views.LogoutView.as_view(next_page='top'), name='logout'),
 ]
 
 if settings.DEBUG:

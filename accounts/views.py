@@ -15,9 +15,6 @@ from django.shortcuts import get_object_or_404
 def home(request):
     return render(request, 'ijunavi/chat.html', {})
 
-def top(request):
-    return render(request, 'ijunavi/top.html', {})
-
 def login_view(request):
     form = LoginForm(request.POST or None)
     error = None
