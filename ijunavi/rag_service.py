@@ -12,15 +12,18 @@ from langchain_chroma import Chroma
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 
-# 環境変数をロード
-load_dotenv("ijunavi/templates/.env")
+# 環境変数をロード (APIキーなど)
+# Django起動時に読み込まれることを想定
+# Djangoプロジェクトのルートディレクトリ（manage.py がある場所）
+load_dotenv()
 
-# === 設定 ===
-# ★重要★: ここで指定したフォルダの中に、手動でPDFやCSVを入れてください
-DATA_DIR = Path("./ijunavi/data/rag_handson/data") 
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ChromaDBの保存先
-DB_DIR = Path("./chroma_db/migration")
+# 設定 ーーー
+DATA_DIR = BASE_DIR / "rag_handson"          # ★ここを修正
+DB_DIR   = BASE_DIR / ".chroma_db" / "migration"
+ZIP_PATH = BASE_DIR / "rag_handson.zip"
+EXTRACT_DIR = BASE_DIR / "rag_handson"
 
 # グローバル変数としてQAチェーンを保持
 qa_chain = None

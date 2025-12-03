@@ -35,8 +35,7 @@ __pycache__/
 db.sqlite3
 
 chroma_db/
-ijunavi/.env
+.env
 rag_handson/
 chroma_db/
-ijunavi/.env
 rag_handson/

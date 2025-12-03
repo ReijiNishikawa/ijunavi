@@ -15,14 +15,21 @@ class SignInForm(forms.ModelForm):
         cleaned_data = super().clean()
         password = cleaned_data.get('password')
         confirm_password = cleaned_data.get('confirm_password')
+
         if password != confirm_password:
             raise forms.ValidationError('パスワードが一致しません。')
+        
+        return cleaned_data
     
-    def save(self):
+    def save(self, commit=True):
         user = super().save(commit=False)
         validate_password(self.cleaned_data.get('password'), user)
         user.set_password(self.cleaned_data.get('password'))
         user.save()
+
+        if commit:
+            user.save()
+
         return user
     
 class LoginForm(forms.Form):

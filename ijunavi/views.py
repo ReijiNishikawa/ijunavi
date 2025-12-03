@@ -215,3 +215,27 @@ def bookmark_remove(request):
         except Exception:
             pass
     return redirect("bookmark")
+
+def bookmark_add(request):
+    """ブックマーク追加（POST）"""
+    if request.method == "POST":
+        title = request.POST.get("title", "").strip()
+        address = request.POST.get("address", "").strip()
+        detail_url = request.POST.get("detail_url", "").strip()
+
+        if not title:
+            # タイトルがない場合は無視
+            return redirect("bookmark")
+
+        bookmarks = _get_bookmarks(request)
+        bookmarks.append({
+            "title": title or "(タイトル未設定)",
+            "address": address or "",
+            "detail_url": detail_url or "",
+            "saved_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
+        })
+        request.session["bookmarks"] = bookmarks
+        request.session.modified = True
+        return redirect("bookmark")
+    return redirect("bookmark")
+
