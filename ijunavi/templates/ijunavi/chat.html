@@ -23,11 +23,12 @@
     <main class="app-main">
       <section class="app-card chat-card" aria-label="チャット">
         {% if not chat_active %}
-          <!-- 初期画面：開始／履歴 -->
+
           <div class="chat-intro">
             <h2>チャットでおすすめの街を探す</h2>
             <p>いくつかの質問に答えるだけで、あなたに合った街をご提案します。</p>
           </div>
+          
           <form method="post" class="chat-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="start">
@@ -106,8 +107,15 @@
       <nav aria-label="ボトムタブ">
         <ul class="bottom-nav">
           <li><a href="{% url 'chat' %}" aria-current="page">chat</a></li>
+
+          {% if user.is_authenticated %}
           <li><a href="/mypage/">my page</a></li>
           <li><a href="/bookmark/">bookmark</a></li>
+          {% else %}
+          <li><a href="{% url 'signup' %}">sign up</a></li>
+          <li><a href="{% url 'login' %}">login</a></li>
+          {% endif %}
+
         </ul>
       </nav>
     </footer>

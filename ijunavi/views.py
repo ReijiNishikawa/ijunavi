@@ -195,6 +195,7 @@ def profile_edit_view(request):
         "form": form,
     })
 
+@login_required
 def bookmark_view(request):
     """ブックマーク一覧"""
     bookmarks = _get_bookmarks(request)
@@ -202,6 +203,7 @@ def bookmark_view(request):
         "bookmarks": bookmarks,
     })
 
+@login_required
 def bookmark_remove(request):
     """ブックマーク解除（POST: index）"""
     if request.method == "POST":
@@ -216,6 +218,7 @@ def bookmark_remove(request):
             pass
     return redirect("bookmark")
 
+@login_required
 def bookmark_add(request):
     """ブックマーク追加（POST）"""
     if request.method == "POST":

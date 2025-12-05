@@ -12,9 +12,6 @@ from django.shortcuts import get_object_or_404
 
 # Create your views here.
 
-def home(request):
-    return render(request, 'ijunavi/chat.html', {})
-
 def top(request):
     return render(request, 'ijunavi/top.html', {})
 

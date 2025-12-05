@@ -21,10 +21,9 @@ from django.conf.urls.static import static
 from ijunavi import views as ijunavi_views
 
 urlpatterns = [
-    path('chat/', ijunavi_views.chat_view, name='chat'),
+    path('', ijunavi_views.chat_view, name='chat'),
     path('chat/history/', ijunavi_views.chat_history, name='history'), 
     path('admin/', admin.site.urls),
-    path('', ijunavi_views.top, name='top'),
     path('mypage/', ijunavi_views.mypage_view, name='mypage'),        # 追加
     path('mypage/edit/', ijunavi_views.profile_edit_view, name='profile_edit'),
     path('bookmark/', ijunavi_views.bookmark_view, name='bookmark'),  # 追加

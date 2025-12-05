@@ -5,7 +5,6 @@ from django.contrib.auth import views as auth_views
 from .forms import SignInForm
 
 urlpatterns = [
-    path('', views.home, name='home'),
     path('top/', views.top, name='top'),
     path('accounts/login/', views.login_view, name='login'),
     path('accounts/logout/', LogoutView.as_view(), name='logout'),
