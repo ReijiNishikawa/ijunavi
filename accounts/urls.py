@@ -7,7 +7,6 @@ from .forms import SignInForm
 urlpatterns = [
     path('top/', views.top, name='top'),
     path('accounts/login/', views.login_view, name='login'),
-    path('accounts/logout/', LogoutView.as_view(), name='logout'),
     path('signup/', views.signup_view, name='signup'),  
     path('verify/<uuid:token>/', views.verify_user, name='verify_user'),
     path("password_reset/", auth_views.PasswordResetView.as_view(), name="password_reset"),
