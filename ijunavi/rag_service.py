@@ -11,6 +11,7 @@ from langchain_chroma import Chroma
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from django.conf import settings
+from langchain.schema import Document
 
 # プロジェクトルート（manage.py がある場所）
 BASE_DIR = settings.BASE_DIR
@@ -49,15 +50,15 @@ def load_and_split_documents():
     csv_files = list(DATA_DIR.rglob("*.csv"))
     for path in csv_files:
         try:
-            df = pd.read_csv(str(path))
+            df = pd.read_csv(str(path), low_memory=False)
             for _, row in df.iterrows():
                 doc_content = f"ファイル: {path.name}\n内容: {row.to_json(orient='index', force_ascii=False)}"
                 # 簡易的なDocumentオブジェクトの作成
                 docs.append(
-                    type('Document', (object,), {
-                        'page_content': doc_content,
-                        'metadata': {"source": str(path.name)}
-                    })()
+                    Document(
+                        page_content=doc_content,
+                        metadata={"source": str(path.name)}
+                    )
                 )
             print(f"  - 読込成功: {path.name}")
         except Exception as e:
@@ -93,27 +94,35 @@ def initialize_vectorstore(chunks):
                 persist_directory=str(DB_DIR),
                 embedding_function=embeddings
             )
-            # チャンクが渡されており、かつDBが空っぽでないか確認する場合のロジックをここに追加しても良い
             return vectorstore
         except Exception as e:
             print(f"RAG: 既存DBのロードに失敗しました: {e}")
             # 失敗したら再作成へ進む
+
     # 新規作成
     print("RAG: 新しいベクトルDBを作成します...")
     if not chunks:
         print("RAG警告: チャンクが空です。空のベクトルストアを作成します（検索機能は動作しません）。")
-        # プレースホルダーで初期化
-        vectorstore = Chroma.from_documents(
-            [type('Document', (object,), {'page_content': 'placeholder', 'metadata': {}})()],
-            embeddings,
-            persist_directory=str(DB_DIR)
+        # 空コレクションだけ作成
+        vectorstore = Chroma(
+            embedding_function=embeddings,
+            persist_directory=str(DB_DIR),
         )
     else:
-        vectorstore = Chroma.from_documents(
-            chunks,
-            embeddings,
-            persist_directory=str(DB_DIR)
+        # 空の Chroma コレクションを作ってから、バッチで追加
+        os.makedirs(DB_DIR, exist_ok=True)
+        vectorstore = Chroma(
+            embedding_function=embeddings,
+            persist_directory=str(DB_DIR),
         )
+
+        batch_size = 1000  # ← 上限5461よりだいぶ小さくして安全側に
+        total = len(chunks)
+        for i in range(0, total, batch_size):
+            batch = chunks[i:i + batch_size]
+            print(f"RAG: ベクトルDBに追加中... {i} 〜 {i + len(batch) - 1} / {total}")
+            vectorstore.add_documents(batch)
+
     print("RAG: ベクトルDBの作成と保存が完了しました。")
     return vectorstore
 def setup_qa_chain(vectorstore):
@@ -125,6 +134,13 @@ def setup_qa_chain(vectorstore):
         os.environ["OPENAI_API_KEY"] = openai_key
         os.environ["OPENAI_BASE_URL"] = "https://api.openai.iniad.org/api/v1"
 
+        # ここを追加：embeddings を setup_qa_chain 内で定義
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small",
+            openai_api_key=openai_key,
+            openai_api_base="https://api.openai.iniad.org/api/v1",
+        )
+
         llm = ChatOpenAI(
             model_name="gpt-4o-mini",
             openai_api_key=openai_key,
@@ -132,20 +148,31 @@ def setup_qa_chain(vectorstore):
             temperature=0.0,
         )
 
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+        # 多様性サンプリング retriever の構築
+                # Chroma の MMR 検索で多様性を確保する retriever
+        retriever = vectorstore.as_retriever(
+            search_type="mmr",
+            search_kwargs={
+                "k": 60,
+                "fetch_k": 500,
+                "lambda_mult": 0.8
+            },
+        )
+
+        # RetrievalQA（retriever モード）
         template = """あなたは地方移住の専門家です。
         提供されたコンテキスト情報とあなたの知識を使って、ユーザーの地方移住に関する質問に親切かつ具体的に答えてください。
         提案する地域は、コンテキスト内の情報に基づいてください。
         また提案する地域は県名ではなく少なくとも市単位にしてください。
         出力する際には参考にしたdataのファイル名を記載してください
-        コンテキストに情報がない場合は、「情報が不足しているため、具体的な提案ができません。他の質問をお願いします。」と答えてください。
-        回答は簡潔にし、まず最も推奨する地域名とその理由を述べ、次に詳細情報を提供してください。
         コンテキスト:
         {context}
         質問:
         {question}
         """
+
         prompt = PromptTemplate.from_template(template)
+
         qa_chain_instance = RetrievalQA.from_chain_type(
             llm=llm,
             retriever=retriever,
@@ -153,10 +180,13 @@ def setup_qa_chain(vectorstore):
             chain_type_kwargs={"prompt": prompt},
             return_source_documents=True
         )
+
         return qa_chain_instance
+
     except Exception as e:
         print(f"RAG: QAチェーンのセットアップに失敗しました。エラー: {e}")
         return None
+
 def initialize_rag():
     """
     RAGチェーンを初期化し、グローバル変数にセットする
