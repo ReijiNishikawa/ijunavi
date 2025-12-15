@@ -5,6 +5,7 @@ from django.http import Http404
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+import re
 
 # 🚨 RAGサービスから回答生成関数をインポート
 from . import rag_service 
@@ -42,9 +43,9 @@ def _get_rag_recommendation(answers):
     age = answers.get("age")
     style = answers.get("style", "")
     climate = answers.get("climate", "")
-    family =answers.get("family","")
-    a_else =answers.get("else","")
-    # ユーザーの回答を統合したプロンプトを作成
+    family = answers.get("family", "")
+    a_else = answers.get("else", "")
+
     prompt = f"""
     私の年齢は{age}歳です。
     家族構成は{family}です。
@@ -52,17 +53,25 @@ def _get_rag_recommendation(answers):
     また{a_else}も考慮してください。
     これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
     """
-    
-    # rag_service.py に定義された回答生成関数を呼び出す
+
     try:
+        # RAG実行
         recommendation_result = rag_service.generate_recommendation(prompt)
+
+        # headline から住所を抽出して map_address に格納
+        headline = recommendation_result.get("headline", "")
+        map_address = extract_address_from_headline(headline)
+        recommendation_result["map_address"] = map_address
+
         return recommendation_result
+
     except Exception as e:
-        # RAGサービスが失敗した場合のフォールバック
         print(f"RAGサービス呼び出しエラー: {e}")
+        headline = "【エラー】情報取得に失敗しました"
         return {
-            "headline": "【エラー】情報取得に失敗しました",
+            "headline": headline,
             "spots": ["システムエラーが発生しました。詳細はサーバーログを確認してください。"],
+            "map_address": extract_address_from_headline(headline),
         }
     
 # --- chat_view ---
@@ -102,15 +111,78 @@ def chat_view(request):
                 messages.append({"role": "user", "text": user_msg})
 
                 qkey = QUESTIONS[step]["key"]
-                
-                # 年齢のバリデーション (簡易版)
+
+                # 1️⃣ 年齢のバリデーション (数字のみ)
                 if qkey == "age":
                     age_val = _int_from_text(user_msg)
                     if age_val is None:
-                        messages.append({"role": "bot", "text": "年齢を数字で入力してください。"})
+                        messages.append({"role": "bot", "text": "よくわかりません。年齢を数字で入力してください。"})
+                        # 質問は進めず、同じ質問をもう一度
+                        request.session.update({
+                            "messages": messages,
+                            "step": step,
+                            "answers": answers,
+                            "result": result,
+                        })
+                        return redirect("chat")
                     else:
                         answers[qkey] = age_val
                         step += 1
+
+                # 2️⃣ 理想の暮らし（自然 / 都市 / バランス）
+                elif qkey == "style":
+                    allowed = ["自然", "都市", "バランス"]
+                    if user_msg not in allowed:
+                        messages.append({
+                            "role": "bot",
+                            "text": "よくわかりません。「自然」「都市」「バランス」から選んでください。"
+                        })
+                        request.session.update({
+                            "messages": messages,
+                            "step": step,
+                            "answers": answers,
+                            "result": result,
+                        })
+                        return redirect("chat")
+                    answers[qkey] = user_msg
+                    step += 1
+
+                # 3️⃣ 気候（暖かい / 涼しい / こだわらない）
+                elif qkey == "climate":
+                    allowed = ["暖かい", "涼しい", "こだわらない"]
+                    if user_msg not in allowed:
+                        messages.append({
+                            "role": "bot",
+                            "text": "よくわかりません。「暖かい」「涼しい」「こだわらない」から選んでください。"
+                        })
+                        request.session.update({
+                            "messages": messages,
+                            "step": step,
+                            "answers": answers,
+                            "result": result,
+                        })
+                        return redirect("chat")
+                    answers[qkey] = user_msg
+                    step += 1
+
+                # 4️⃣ 家族構成（形式までは厳しくチェックしないで、空だけNGにする）
+                elif qkey == "family":
+                    if not user_msg:
+                        messages.append({
+                            "role": "bot",
+                            "text": "よくわかりません。家族構成を簡単に教えてください。"
+                        })
+                        request.session.update({
+                            "messages": messages,
+                            "step": step,
+                            "answers": answers,
+                            "result": result,
+                        })
+                        return redirect("chat")
+                    answers[qkey] = user_msg
+                    step += 1
+
+                # 5️⃣ その他の条件（自由入力なので基本なんでもOK）
                 else:
                     answers[qkey] = user_msg
                     step += 1
@@ -120,12 +192,15 @@ def chat_view(request):
                     messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
                 else:
                     # 🚨 RAGサービスから結果を取得
-                    result = _get_rag_recommendation(answers) 
+                    result = _get_rag_recommendation(answers)
                     messages.append({"role": "bot", "text": "ありがとうございます。条件に合う候補を用意しました。"})
-                    step = 100 # 結果表示段階
+                    step = 100  # 結果表示段階
 
                 request.session.update({
-                    "messages": messages, "step": step, "answers": answers, "result": result
+                    "messages": messages,
+                    "step": step,
+                    "answers": answers,
+                    "result": result,
                 })
             return redirect("chat")
 
@@ -242,3 +317,36 @@ def bookmark_add(request):
         return redirect("bookmark")
     return redirect("bookmark")
 
+def extract_address_from_headline(headline: str) -> str:
+    """
+    RAG の見出しテキストから地図用の住所を取り出す。
+    例:
+      最も推奨する地域は「南城市（沖縄県）」です。
+      → 沖縄県南城市
+    """
+
+    if not headline:
+        return ""
+
+    # まず「〜」の中身を取る（「南城市（沖縄県）」など）
+    m = re.search(r'「(.+?)」', headline)
+    if m:
+        name = m.group(1).strip()  # '南城市（沖縄県）'
+
+        # 「市（県）」のようなパターンを分解
+        m2 = re.match(r'(.+)[(（](.+?)[)）]', name)
+        if m2:
+            city = m2.group(1).strip()   # 南城市
+            pref = m2.group(2).strip()   # 沖縄県
+            return f"{pref}{city}"       # 沖縄県南城市
+
+        # かっこが無ければそのまま住所として使う
+        return name
+
+    # 「」が無い場合は「○○県○○市」パターンを探す
+    m = re.search(r'(..[都道府県].+?[市区町村])', headline)
+    if m:
+        return m.group(1).strip()
+
+    # 何も取れなかったら、念のため全文を返す
+    return headline.strip()

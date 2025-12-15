@@ -367,3 +367,9 @@ input[type="email"],input[type="password"] {
         max-height: 220px;
     }
 }
+
+#result-map {
+    width: 100%;
+    height: 300px;      /* 好きな高さに調整 */
+    border-radius: 16px;
+}

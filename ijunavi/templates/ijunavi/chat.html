@@ -41,25 +41,35 @@
             <!-- 質問完了：おすすめ表示 -->
             <div class="chat-result">
               <h2>{{ result.headline }}</h2>
+
+              <!-- ブックマークフォーム -->
               <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
                 {% csrf_token %}
                 <input type="hidden" name="title" value="{{ result.headline }}">
-                <input type="hidden" name="address" value="">
+                <!-- ★地図に使う住所もブックマークに保存 -->
+                <input type="hidden" name="address" value="{{ result.map_address|default:result.headline }}">
                 <input type="hidden" name="detail_url" value="">
                 <button type="submit" class="button signup-button">この提案をブックマーク</button>
               </form>
+
+              <!-- ★Googleマップを表示するエリア -->
               <div class="chat-map">
-                <p>[ 地図表示（プレースホルダ） ]</p>
-                <p>※地図やピンはCSS/画像を追加すると再現できます</p>
+                <div id="result-map"
+                    data-address="{{ result.map_address|default:result.headline }}">
+                </div>
               </div>
+
+              <!-- RAGからのスポット一覧表示 -->
               <div class="chat-spots">
                 {% for line in result.spots %}
                   <div>{{ line }}</div>
                 {% endfor %}
               </div>
+
               <p class="chat-link">
                 <a href="{% url 'history' %}">履歴をみる</a>
               </p>
+
               <form method="post" class="chat-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="reset">
@@ -121,5 +131,53 @@
     </footer>
 
   </div>
+    <script>
+    function initMap() {
+      const mapElement = document.getElementById("result-map");
+      if (!mapElement) return;
+
+      // Django から埋め込んだ住所（例：沖縄県南城市）
+      const address = mapElement.dataset.address;
+
+      // 初期表示は日本全体寄り
+      const defaultCenter = { lat: 35.681236, lng: 139.767125 };
+
+      const map = new google.maps.Map(mapElement, {
+        center: defaultCenter,
+        zoom: 5,
+      });
+
+      if (!address) {
+        console.warn("住所が指定されていません");
+        return;
+      }
+
+      const geocoder = new google.maps.Geocoder();
+
+      geocoder.geocode({ address: address }, function(results, status) {
+        if (status === "OK" && results[0]) {
+          const loc = results[0].geometry.location;
+          map.setCenter(loc);
+          map.setZoom(11);
+
+          new google.maps.Marker({
+            map: map,
+            position: loc,
+            title: address,
+          });
+        } else {
+          console.error("Geocode failed: " + status);
+        }
+      });
+    }
+  </script>
+
+  <!-- ★YOUR_API_KEY をあなたのキーに置き換える -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGXd3I891Z_bk821cyKVx4o70AIan45L0&callback=initMap"
+    async
+    defer
+  ></script>
+
 </body>
 </html>
