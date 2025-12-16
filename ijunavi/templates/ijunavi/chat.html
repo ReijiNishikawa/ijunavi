@@ -128,9 +128,70 @@
 
         </ul>
       </nav>
-    </footer>
+  </footer>
 
   </div>
+    <script>
+    // Keep viewport/chat log from jumping after submitting chat forms
+    (function() {
+      var pageScrollKey = "chatPageScrollY";
+      var logScrollKey = "chatLogScrollY";
+      var scrollToBottomKey = "chatLogShouldScrollToBottom";
+
+      if ("scrollRestoration" in history) {
+        history.scrollRestoration = "manual";
+      }
+
+      // Remember scroll positions right before any chat form submits
+      document.querySelectorAll(".chat-form").forEach(function(form) {
+        form.addEventListener("submit", function() {
+          sessionStorage.setItem(pageScrollKey, String(window.scrollY));
+
+          // If this is the send action, scroll to the newest message on reload
+          var actionInput = form.querySelector('input[name="action"]');
+          if (actionInput && actionInput.value === "send") {
+            sessionStorage.setItem(scrollToBottomKey, "1");
+          }
+
+          var log = document.querySelector(".chat-log");
+          if (log) {
+            sessionStorage.setItem(logScrollKey, String(log.scrollTop));
+          }
+        });
+      });
+
+      // Restore positions on load so the view stays where the user was
+      window.addEventListener("DOMContentLoaded", function() {
+        var savedPageY = sessionStorage.getItem(pageScrollKey);
+        var log = document.querySelector(".chat-log");
+        var chatCard = document.querySelector(".chat-card");
+
+        if (savedPageY !== null) {
+          window.scrollTo(0, Number(savedPageY));
+        } else if (chatCard) {
+          chatCard.scrollIntoView({ block: "start" });
+        }
+        sessionStorage.removeItem(pageScrollKey);
+
+        if (log) {
+          var savedLogY = sessionStorage.getItem(logScrollKey);
+          var shouldScrollToBottom = sessionStorage.getItem(scrollToBottomKey) === "1";
+
+          // Prioritize moving to the bottom after sending a chat message
+          if (shouldScrollToBottom) {
+            log.scrollTop = log.scrollHeight;
+          } else if (savedLogY !== null) {
+            log.scrollTop = Number(savedLogY);
+          } else {
+            log.scrollTop = log.scrollHeight;
+          }
+
+          sessionStorage.removeItem(logScrollKey);
+          sessionStorage.removeItem(scrollToBottomKey);
+        }
+      });
+    })();
+  </script>
     <script>
     function initMap() {
       const mapElement = document.getElementById("result-map");
