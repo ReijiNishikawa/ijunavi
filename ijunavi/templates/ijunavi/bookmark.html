@@ -30,7 +30,7 @@
 【地図サムネイル】{{ bm.title|default:"施設名" }}
 住所：{{ bm.address|default:"東京都○○区…" }}
 保存日時：{{ bm.saved_at|default:"（未記録）" }}
-[詳細]
+<a href="{% url 'bookmark_detail' forloop.counter0 %}">[詳細]</a>
               </pre>
               <form method="post" action="{% url 'bookmark_remove' %}" class="bookmark-form">
                 {% csrf_token %}

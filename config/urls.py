@@ -30,7 +30,7 @@ urlpatterns = [
     path('bookmark/', ijunavi_views.bookmark_view, name='bookmark'),  # 追加
     path('bookmark/add/', ijunavi_views.bookmark_add, name='bookmark_add'), 
     path('bookmark/remove/', ijunavi_views.bookmark_remove, name='bookmark_remove'),  # 解除
-    
+    path("bookmark/detail/<int:index>/", ijunavi_views.bookmark_detail, name="bookmark_detail"),
     path('accounts/', include('accounts.urls')),
     path('logout/', auth_views.LogoutView.as_view(next_page='top'), name='logout'),
 ]

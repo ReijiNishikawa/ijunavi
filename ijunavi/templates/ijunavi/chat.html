@@ -46,9 +46,8 @@
               <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
                 {% csrf_token %}
                 <input type="hidden" name="title" value="{{ result.headline }}">
-                <!-- ★地図に使う住所もブックマークに保存 -->
-                <input type="hidden" name="address" value="{{ result.map_address|default:result.headline }}">
-                <input type="hidden" name="detail_url" value="">
+                <input type="hidden" name="address" value="{{ result.map_address }}">
+                <input type="hidden" name="spots" value="{{ result.spots|join:'|||'}}">
                 <button type="submit" class="button signup-button">この提案をブックマーク</button>
               </form>
 

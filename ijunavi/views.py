@@ -296,25 +296,34 @@ def bookmark_remove(request):
 @login_required
 def bookmark_add(request):
     """ブックマーク追加（POST）"""
-    if request.method == "POST":
-        title = request.POST.get("title", "").strip()
-        address = request.POST.get("address", "").strip()
-        detail_url = request.POST.get("detail_url", "").strip()
-
-        if not title:
-            # タイトルがない場合は無視
-            return redirect("bookmark")
-
-        bookmarks = _get_bookmarks(request)
-        bookmarks.append({
-            "title": title or "(タイトル未設定)",
-            "address": address or "",
-            "detail_url": detail_url or "",
-            "saved_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
-        })
-        request.session["bookmarks"] = bookmarks
-        request.session.modified = True
+    if request.method != "POST":
         return redirect("bookmark")
+
+    title = request.POST.get("title", "").strip()
+    address = request.POST.get("address", "").strip()
+
+    spots_raw = request.POST.get("spots", "")
+    spots = [s for s in spots_raw.split("|||") if s.strip()] if spots_raw else []
+
+    if not title:
+        return redirect("bookmark")
+
+    bookmarks = _get_bookmarks(request)
+
+    # sessionの配列indexを使って detail_url を作る（追加後の番号）
+    new_index = len(bookmarks)
+    detail_url = f"/bookmark/detail/{new_index}/"
+
+    bookmarks.append({
+        "title": title or "(タイトル未設定)",
+        "address": address or "",
+        "spots": spots,  # ★これがないと詳細で落ちる
+        "detail_url": detail_url,
+        "saved_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
+    })
+
+    request.session["bookmarks"] = bookmarks
+    request.session.modified = True
     return redirect("bookmark")
 
 def extract_address_from_headline(headline: str) -> str:
@@ -350,3 +359,21 @@ def extract_address_from_headline(headline: str) -> str:
 
     # 何も取れなかったら、念のため全文を返す
     return headline.strip()
+
+@login_required
+def bookmark_detail(request, index):
+    bookmarks = _get_bookmarks(request)
+
+    try:
+        index = int(index)
+        data = bookmarks[index]
+    except:
+        raise Http404("ブックマークが存在しません")
+
+    return render(request, "ijunavi/bookmark_detail.html", {
+        "title": data.get("title", ""),
+        "address": data.get("address", ""),
+        "spots": data.get("spots", []),
+    })
+
+
