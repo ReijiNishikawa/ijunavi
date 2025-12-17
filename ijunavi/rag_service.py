@@ -153,9 +153,9 @@ def setup_qa_chain(vectorstore):
         retriever = vectorstore.as_retriever(
             search_type="mmr",
             search_kwargs={
-                "k": 60,
-                "fetch_k": 500,
-                "lambda_mult": 0.8
+                "k": 4,
+                "fetch_k": 10,
+                "lambda_mult": 0.5
             },
         )
 
