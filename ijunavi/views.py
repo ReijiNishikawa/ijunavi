@@ -6,6 +6,9 @@ from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 import re
+import threading
+from django.http import JsonResponse
+from django.urls import reverse
 
 # 🚨 RAGサービスから回答生成関数をインポート
 from . import rag_service 
@@ -105,103 +108,107 @@ def chat_view(request):
             return redirect("chat")
 
         # 送信ロジック
-        elif action == "send" and chat_active and step >= 0 and step < len(QUESTIONS):
+        elif action == "send" and chat_active and 0 <= step < len(QUESTIONS):
+            is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            bot_messages = []
+
             user_msg = _normalize(request.POST.get("message"))
             if user_msg:
                 messages.append({"role": "user", "text": user_msg})
-
                 qkey = QUESTIONS[step]["key"]
 
-                # 1️⃣ 年齢のバリデーション (数字のみ)
+                # 1️⃣ 年齢
                 if qkey == "age":
                     age_val = _int_from_text(user_msg)
                     if age_val is None:
-                        messages.append({"role": "bot", "text": "よくわかりません。年齢を数字で入力してください。"})
-                        # 質問は進めず、同じ質問をもう一度
-                        request.session.update({
-                            "messages": messages,
-                            "step": step,
-                            "answers": answers,
-                            "result": result,
-                        })
-                        return redirect("chat")
-                    else:
-                        answers[qkey] = age_val
-                        step += 1
+                        msg = "よくわかりません。年齢を数字で入力してください。"
+                        messages.append({"role": "bot", "text": msg})
+                        request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
 
-                # 2️⃣ 理想の暮らし（自然 / 都市 / バランス）
+                        if is_ajax:
+                            return JsonResponse({"ok": True, "bot_messages": [msg]})
+                        return redirect("chat")
+                    answers[qkey] = age_val
+                    step += 1
+
+                # 2️⃣ style
                 elif qkey == "style":
                     allowed = ["自然", "都市", "バランス"]
                     if user_msg not in allowed:
-                        messages.append({
-                            "role": "bot",
-                            "text": "よくわかりません。「自然」「都市」「バランス」から選んでください。"
-                        })
-                        request.session.update({
-                            "messages": messages,
-                            "step": step,
-                            "answers": answers,
-                            "result": result,
-                        })
+                        msg = "よくわかりません。「自然」「都市」「バランス」から選んでください。"
+                        messages.append({"role": "bot", "text": msg})
+                        request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                        if is_ajax:
+                            return JsonResponse({"ok": True, "bot_messages": [msg]})
                         return redirect("chat")
                     answers[qkey] = user_msg
                     step += 1
 
-                # 3️⃣ 気候（暖かい / 涼しい / こだわらない）
+                # 3️⃣ climate
                 elif qkey == "climate":
                     allowed = ["暖かい", "涼しい", "こだわらない"]
                     if user_msg not in allowed:
-                        messages.append({
-                            "role": "bot",
-                            "text": "よくわかりません。「暖かい」「涼しい」「こだわらない」から選んでください。"
-                        })
-                        request.session.update({
-                            "messages": messages,
-                            "step": step,
-                            "answers": answers,
-                            "result": result,
-                        })
+                        msg = "よくわかりません。「暖かい」「涼しい」「こだわらない」から選んでください。"
+                        messages.append({"role": "bot", "text": msg})
+                        request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                        if is_ajax:
+                            return JsonResponse({"ok": True, "bot_messages": [msg]})
                         return redirect("chat")
                     answers[qkey] = user_msg
                     step += 1
 
-                # 4️⃣ 家族構成（形式までは厳しくチェックしないで、空だけNGにする）
+                # 4️⃣ family
                 elif qkey == "family":
                     if not user_msg:
-                        messages.append({
-                            "role": "bot",
-                            "text": "よくわかりません。家族構成を簡単に教えてください。"
-                        })
-                        request.session.update({
-                            "messages": messages,
-                            "step": step,
-                            "answers": answers,
-                            "result": result,
-                        })
+                        msg = "よくわかりません。家族構成を簡単に教えてください。"
+                        messages.append({"role": "bot", "text": msg})
+                        request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                        if is_ajax:
+                            return JsonResponse({"ok": True, "bot_messages": [msg]})
                         return redirect("chat")
                     answers[qkey] = user_msg
                     step += 1
 
-                # 5️⃣ その他の条件（自由入力なので基本なんでもOK）
+                # 5️⃣ else
                 else:
                     answers[qkey] = user_msg
                     step += 1
 
                 # 次の質問 or 結果表示
                 if step < len(QUESTIONS):
-                    messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
+                    next_q = QUESTIONS[step]["ask"]
+                    messages.append({"role": "bot", "text": next_q})
+                    bot_messages.append(next_q)
                 else:
-                    # 🚨 RAGサービスから結果を取得
-                    result = _get_rag_recommendation(answers)
-                    messages.append({"role": "bot", "text": "ありがとうございます。条件に合う候補を用意しました。"})
-                    step = 100  # 結果表示段階
+                    # 🚨RAG実行（ここが重いのでローディングが効く）
+                    # ここでは結果を作らない（進捗表示のため）
+                    done_msg = "おすすめを作成中です…（しばらくお待ちください）"
+                    messages.append({"role": "bot", "text": done_msg})
+                    bot_messages.append(done_msg)
 
-                request.session.update({
-                    "messages": messages,
-                    "step": step,
-                    "answers": answers,
-                    "result": result,
-                })
+                    result = None
+                    step = 99  # 作成中ステータスとして使う
+
+                request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                if is_ajax:
+                    if step == 99:
+                        return JsonResponse({
+                            "ok": True,
+                            "bot_messages": bot_messages,
+                            "need_rag_progress": True,
+                            "init_url": reverse("rag_init"),
+                            "progress_url": reverse("rag_progress"),
+                            "recommend_url": reverse("rag_recommend"),
+                        })
+                    return JsonResponse({"ok": True, "bot_messages": bot_messages})
+
+            # 空送信など
+            if is_ajax:
+                return JsonResponse({"ok": False})
             return redirect("chat")
 
         # リセットロジック
@@ -376,4 +383,34 @@ def bookmark_detail(request, index):
         "spots": data.get("spots", []),
     })
 
+_rag_thread = None
+
+def rag_init(request):
+    global _rag_thread
+
+    st = rag_service.get_rag_status()
+    if st.get("state") in ("building", "ready"):
+        return JsonResponse(st)
+
+    def runner():
+        try:
+            rag_service.initialize_rag()
+        except Exception:
+            pass
+
+    _rag_thread = threading.Thread(target=runner, daemon=True)
+    _rag_thread.start()
+
+    return JsonResponse(rag_service.get_rag_status())
+
+def rag_progress(request):
+    return JsonResponse(rag_service.get_rag_status())
+
+def rag_recommend(request):
+    answers = request.session.get("answers", {})
+    result = _get_rag_recommendation(answers)
+    request.session["result"] = result
+    request.session["step"] = 100
+    request.session.modified = True
+    return JsonResponse({"ok": True, "redirect_url": reverse("chat")})
 
