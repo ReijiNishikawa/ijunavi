@@ -6,7 +6,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 import traceback
 import threading
-import time
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -27,7 +26,7 @@ DATA_DIR = BASE_DIR / "ijunavi" / "data" / "rag_handson" / "data"
 DB_DIR   = BASE_DIR / ".chroma_db" / "migration"
 
 # 使うCSVを固定（ホワイトリスト）
-ALLOWED_CSV = {"2024人口.csv", "2024医療.csv", "2024居住.csv", "2024教育.csv"}
+ALLOWED_CSV = {"2024人口.csv", "2024医療.csv", "2024居住.csv", "2024教育.csv", "tenpo2511.csv"}
 
 # CSV更新検知用（DB内に保存）
 FINGERPRINT_PATH = DB_DIR / "_fingerprint.json"
@@ -68,7 +67,6 @@ def csv_df_to_grouped_docs(df: pd.DataFrame, source_name: str, group_rows: int =
         )
     return docs
 
-
 def compute_data_fingerprint() -> dict:
     items = []
     for p in DATA_DIR.rglob("*.csv"):
@@ -86,7 +84,6 @@ def compute_data_fingerprint() -> dict:
     payload["hash"] = hashlib.sha256(raw).hexdigest()
     return payload
 
-
 def load_saved_fingerprint() -> dict | None:
     try:
         if FINGERPRINT_PATH.exists():
@@ -95,11 +92,77 @@ def load_saved_fingerprint() -> dict | None:
         return None
     return None
 
-
 def save_fingerprint(fp: dict) -> None:
     os.makedirs(DB_DIR, exist_ok=True)
     FINGERPRINT_PATH.write_text(json.dumps(fp, ensure_ascii=False, indent=2), encoding="utf-8")
 
+def _read_csv_safely(path: Path, **kwargs) -> pd.DataFrame:
+    try:
+        return pd.read_csv(str(path), low_memory=False, **kwargs)
+    except UnicodeDecodeError:
+        return pd.read_csv(str(path), low_memory=False, encoding="cp932", **kwargs)
+
+def load_tenpo2511_as_long_df(path: Path) -> pd.DataFrame:
+    df = _read_csv_safely(path, header=2)
+
+    if len(df.columns) >= 2:
+        df = df.rename(columns={df.columns[0]: "year", df.columns[1]: "timing"})
+
+    for col in ["合計", "集計日", "year", "timing"]:
+        if col not in df.columns:
+            pass
+
+    id_cols = [c for c in ["year", "timing", "集計日"] if c in df.columns]
+    if not id_cols:
+        raise ValueError("tenpo2511.csv のヘッダー解析に失敗しました（year/timing/集計日が見つかりません）")
+
+    exclude = set(id_cols) | {"合計"}
+    pref_cols = [c for c in df.columns if c not in exclude]
+
+    long_df = df.melt(
+        id_vars=id_cols,
+        value_vars=pref_cols,
+        var_name="prefecture",
+        value_name="store_count",
+    )
+
+    long_df["store_count"] = pd.to_numeric(long_df["store_count"], errors="coerce")
+    long_df = long_df.dropna(subset=["store_count"]).reset_index(drop=True)
+
+    if "集計日" in long_df.columns:
+        long_df["date"] = long_df["集計日"].astype(str)
+    else:
+        long_df["date"] = ""
+
+    if "year" not in long_df.columns:
+        long_df["year"] = ""
+    if "timing" not in long_df.columns:
+        long_df["timing"] = ""
+
+    return long_df[["year", "timing", "date", "prefecture", "store_count"]]
+
+def tenpo_long_df_to_docs(long_df: pd.DataFrame, source_name: str, group_rows: int = 1200) -> list[Document]:
+    docs = []
+    total = len(long_df)
+    for start in range(0, total, group_rows):
+        end = min(start + group_rows, total)
+        part = long_df.iloc[start:end]
+
+        lines = []
+        for _, r in part.iterrows():
+            sc = int(r["store_count"]) if pd.notna(r["store_count"]) else r["store_count"]
+            lines.append(
+                f"スーパー店舗数。{r['year']} {r['timing']}（集計日 {r['date']}）"
+                f"{r['prefecture']}の店舗数は{sc}。"
+            )
+
+        docs.append(
+            Document(
+                page_content="\n".join(lines),
+                metadata={"source": source_name, "row_from": start + 1, "row_to": end},
+            )
+        )
+    return docs
 
 # --- RAG初期化関連の関数 ---
 def load_and_split_documents():
@@ -113,16 +176,16 @@ def load_and_split_documents():
     csv_files = [p for p in DATA_DIR.rglob("*.csv") if p.name in ALLOWED_CSV]
     for path in csv_files:
         try:
-            df = pd.read_csv(str(path), low_memory=False)
-
-            grouped_docs = csv_df_to_grouped_docs(
-                df,
-                source_name=path.name,
-                group_rows=800
-            )
-
-            docs.extend(grouped_docs)
-            print(f"  - 読込成功: {path.name}（{len(df)}行 → {len(grouped_docs)}docs）")
+            if path.name == "tenpo2511.csv":
+                long_df = load_tenpo2511_as_long_df(path)
+                grouped_docs = tenpo_long_df_to_docs(long_df, source_name=path.name, group_rows=1200)
+                docs.extend(grouped_docs)
+                print(f"  - 読込成功: {path.name}（{len(long_df)}行(整形後) → {len(grouped_docs)}docs）")
+            else:
+                df = _read_csv_safely(path)
+                grouped_docs = csv_df_to_grouped_docs(df, source_name=path.name, group_rows=800)
+                docs.extend(grouped_docs)
+                print(f"  - 読込成功: {path.name}（{len(df)}行 → {len(grouped_docs)}docs）")
 
         except Exception as e:
             print(f"  - 読込失敗: {path.name} ({e})")
@@ -137,7 +200,6 @@ def load_and_split_documents():
     chunks = splitter.split_documents(docs)
     print(f"RAG: {len(chunks)} 個のチャンクに分割されました。")
     return chunks
-
 
 def initialize_vectorstore(chunks):
     openai_key = os.getenv("OPENAI_API_KEY")
@@ -158,7 +220,6 @@ def initialize_vectorstore(chunks):
     saved_fp = load_saved_fingerprint()
     db_exists = DB_DIR.exists() and any(DB_DIR.iterdir())
 
-    # ① DBが存在して、CSVが変わっていないならロードだけ（最速）
     if db_exists and saved_fp and saved_fp.get("hash") == current_fp.get("hash"):
         print("RAG: 既存のベクトルDBをロードします。（CSV変更なし）")
         _set_status(
@@ -175,7 +236,6 @@ def initialize_vectorstore(chunks):
         )
         return vectorstore
 
-    # ② それ以外は再作成（CSVが変わった or 初回）
     if db_exists:
         print("RAG: CSVが更新されたため、既存DBを削除して再作成します。")
         import shutil
@@ -217,7 +277,6 @@ def initialize_vectorstore(chunks):
 
     save_fingerprint(current_fp)
 
-    # ✅ ここが重要：完了状態にする（これが無いと永遠にbuildingのまま）
     _set_status(
         state="ready",
         total=total,
@@ -281,7 +340,6 @@ def setup_qa_chain(vectorstore):
         print(f"RAG: QAチェーンのセットアップに失敗しました。エラー: {e}")
         return None
 
-
 def initialize_rag():
     global qa_chain
     if qa_chain is not None:
@@ -293,7 +351,6 @@ def initialize_rag():
         saved_fp = load_saved_fingerprint()
         db_exists = DB_DIR.exists() and any(DB_DIR.iterdir())
 
-        # CSV変更なし＆DBありなら、chunks作成をスキップして最速起動
         if db_exists and saved_fp and saved_fp.get("hash") == current_fp.get("hash"):
             print("RAG: CSV変更なしのため、チャンク作成をスキップします。")
             chunks = []
@@ -314,7 +371,6 @@ def initialize_rag():
         qa_chain = None
 
     return qa_chain
-
 
 def generate_recommendation(prompt: str) -> dict:
     global qa_chain
