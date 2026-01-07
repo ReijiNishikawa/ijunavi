@@ -5,10 +5,6 @@ from django.http import Http404
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-import re
-import threading
-from django.http import JsonResponse
-from django.urls import reverse
 
 # 🚨 RAGサービスから回答生成関数をインポート
 from . import rag_service 
@@ -25,11 +21,9 @@ INITIAL_BOT_MESSAGES = [
 ]
 
 QUESTIONS = [
-    {"key": "age", "ask": "年齢を教えてください（数字のみ）", "choices": []},
-    {"key": "style", "ask": "どんな暮らしが理想？", "choices": ["自然", "都市", "バランス"]},
-    {"key": "climate", "ask": "好きな気候は？", "choices": ["暖かい", "涼しい", "こだわらない"]},
-    {"key": "family", "ask": "家族構成は？", "choices": ["単身", "夫婦のみ", "子どものいる世帯", "二世帯"]},
-    {"key": "else", "ask": "その他の条件を入力してください", "choices": []},
+    {"key": "age", "ask": "年齢を教えてください（数字のみ）"},
+    {"key": "style", "ask": "どんな暮らしが理想？（自然 / 都市 / バランス）"},
+    {"key": "climate", "ask": "好きな気候は？（暖かい / 涼しい / こだわらない）"},
 ]
 
 def _normalize(s: str) -> str:
@@ -46,35 +40,24 @@ def _get_rag_recommendation(answers):
     age = answers.get("age")
     style = answers.get("style", "")
     climate = answers.get("climate", "")
-    family = answers.get("family", "")
-    a_else = answers.get("else", "")
 
+    # ユーザーの回答を統合したプロンプトを作成
     prompt = f"""
     私の年齢は{age}歳です。
-    家族構成は{family}です。
     理想の暮らしは「{style}」で、好きな気候は「{climate}」です。
-    また{a_else}も考慮してください。
     これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
     """
-
+    
+    # rag_service.py に定義された回答生成関数を呼び出す
     try:
-        # RAG実行
         recommendation_result = rag_service.generate_recommendation(prompt)
-
-        # headline から住所を抽出して map_address に格納
-        headline = recommendation_result.get("headline", "")
-        map_address = extract_address_from_headline(headline)
-        recommendation_result["map_address"] = map_address
-
         return recommendation_result
-
     except Exception as e:
+        # RAGサービスが失敗した場合のフォールバック
         print(f"RAGサービス呼び出しエラー: {e}")
-        headline = "【エラー】情報取得に失敗しました"
         return {
-            "headline": headline,
+            "headline": "【エラー】情報取得に失敗しました",
             "spots": ["システムエラーが発生しました。詳細はサーバーログを確認してください。"],
-            "map_address": extract_address_from_headline(headline),
         }
     
 # --- chat_view ---
@@ -82,19 +65,14 @@ def _get_rag_recommendation(answers):
 def chat_view(request):
     chat_active = request.session.get("chat_active", False)
     messages = request.session.get("messages", [])
-    step = request.session.get("step", -1)  # -1:未開始, 0..質問index, 100:結果表示
+    step = request.session.get("step", -1) # -1:未開始, 0..質問index, 100:結果表示
     answers = request.session.get("answers", {})
     result = request.session.get("result")
-
-    if 0 <= step < len(QUESTIONS):
-        question_data = QUESTIONS[step]
-    else:
-        question_data = None
 
     if request.method == "POST":
         action = request.POST.get("action")
 
-        # 開始ロジック
+        # 開始ロジック 
         if action == "start":
             chat_active = True
             messages = [{"role": "bot", "text": msg} for msg in INITIAL_BOT_MESSAGES]
@@ -102,7 +80,7 @@ def chat_view(request):
             messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
             answers = {}
             result = None
-
+            
             request.session.update({
                 "chat_active": chat_active,
                 "messages": messages,
@@ -113,14 +91,14 @@ def chat_view(request):
             return redirect("chat")
 
         # 送信ロジック
-        elif action == "send" and chat_active and 0 <= step < len(QUESTIONS):
-            user_msg = _normalize(request.POST.get("choice") or request.POST.get("message"))
-
+        elif action == "send" and chat_active and step >= 0 and step < len(QUESTIONS):
+            user_msg = _normalize(request.POST.get("message"))
             if user_msg:
                 messages.append({"role": "user", "text": user_msg})
-                qkey = QUESTIONS[step]["key"]
 
-                # 年齢のバリデーション
+                qkey = QUESTIONS[step]["key"]
+                
+                # 年齢のバリデーション (簡易版)
                 if qkey == "age":
                     age_val = _int_from_text(user_msg)
                     if age_val is None:
@@ -136,32 +114,26 @@ def chat_view(request):
                 if step < len(QUESTIONS):
                     messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
                 else:
-                    result = _get_rag_recommendation(answers)
-                    messages.append({
-                        "role": "bot",
-                        "text": "ありがとうございます。条件に合う候補を用意しました。"
-                    })
-                    step = 100
+                    # 🚨 RAGサービスから結果を取得
+                    result = _get_rag_recommendation(answers) 
+                    messages.append({"role": "bot", "text": "ありがとうございます。条件に合う候補を用意しました。"})
+                    step = 100 # 結果表示段階
 
                 request.session.update({
-                    "messages": messages,
-                    "step": step,
-                    "answers": answers,
-                    "result": result,
+                    "messages": messages, "step": step, "answers": answers, "result": result
                 })
-
             return redirect("chat")
 
         # リセットロジック
         elif action == "reset":
             for k in ("chat_active", "messages", "step", "answers", "result"):
-                request.session.pop(k, None)
+                if k in request.session:
+                    del request.session[k]
             return redirect("chat")
 
     return render(request, "ijunavi/chat.html", {
         "chat_active": chat_active,
         "messages": messages,
-        "question_data": question_data,
         "step": step,
         "answers": answers,
         "result": result,
@@ -218,7 +190,6 @@ def profile_edit_view(request):
         "form": form,
     })
 
-@login_required
 def bookmark_view(request):
     """ブックマーク一覧"""
     bookmarks = _get_bookmarks(request)
@@ -226,7 +197,6 @@ def bookmark_view(request):
         "bookmarks": bookmarks,
     })
 
-@login_required
 def bookmark_remove(request):
     """ブックマーク解除（POST: index）"""
     if request.method == "POST":
@@ -241,117 +211,26 @@ def bookmark_remove(request):
             pass
     return redirect("bookmark")
 
-@login_required
 def bookmark_add(request):
     """ブックマーク追加（POST）"""
-    if request.method != "POST":
+    if request.method == "POST":
+        title = request.POST.get("title", "").strip()
+        address = request.POST.get("address", "").strip()
+        detail_url = request.POST.get("detail_url", "").strip()
+
+        if not title:
+            # タイトルがない場合は無視
+            return redirect("bookmark")
+
+        bookmarks = _get_bookmarks(request)
+        bookmarks.append({
+            "title": title or "(タイトル未設定)",
+            "address": address or "",
+            "detail_url": detail_url or "",
+            "saved_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
+        })
+        request.session["bookmarks"] = bookmarks
+        request.session.modified = True
         return redirect("bookmark")
-
-    title = request.POST.get("title", "").strip()
-    address = request.POST.get("address", "").strip()
-
-    spots_raw = request.POST.get("spots", "")
-    spots = [s for s in spots_raw.split("|||") if s.strip()] if spots_raw else []
-
-    if not title:
-        return redirect("bookmark")
-
-    bookmarks = _get_bookmarks(request)
-
-    # sessionの配列indexを使って detail_url を作る（追加後の番号）
-    new_index = len(bookmarks)
-    detail_url = f"/bookmark/detail/{new_index}/"
-
-    bookmarks.append({
-        "title": title or "(タイトル未設定)",
-        "address": address or "",
-        "spots": spots,  # ★これがないと詳細で落ちる
-        "detail_url": detail_url,
-        "saved_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
-    })
-
-    request.session["bookmarks"] = bookmarks
-    request.session.modified = True
     return redirect("bookmark")
-
-def extract_address_from_headline(headline: str) -> str:
-    """
-    RAG の見出しテキストから地図用の住所を取り出す。
-    例:
-      最も推奨する地域は「南城市（沖縄県）」です。
-      → 沖縄県南城市
-    """
-
-    if not headline:
-        return ""
-
-    # まず「〜」の中身を取る（「南城市（沖縄県）」など）
-    m = re.search(r'「(.+?)」', headline)
-    if m:
-        name = m.group(1).strip()  # '南城市（沖縄県）'
-
-        # 「市（県）」のようなパターンを分解
-        m2 = re.match(r'(.+)[(（](.+?)[)）]', name)
-        if m2:
-            city = m2.group(1).strip()   # 南城市
-            pref = m2.group(2).strip()   # 沖縄県
-            return f"{pref}{city}"       # 沖縄県南城市
-
-        # かっこが無ければそのまま住所として使う
-        return name
-
-    # 「」が無い場合は「○○県○○市」パターンを探す
-    m = re.search(r'(..[都道府県].+?[市区町村])', headline)
-    if m:
-        return m.group(1).strip()
-
-    # 何も取れなかったら、念のため全文を返す
-    return headline.strip()
-
-@login_required
-def bookmark_detail(request, index):
-    bookmarks = _get_bookmarks(request)
-
-    try:
-        index = int(index)
-        data = bookmarks[index]
-    except:
-        raise Http404("ブックマークが存在しません")
-
-    return render(request, "ijunavi/bookmark_detail.html", {
-        "title": data.get("title", ""),
-        "address": data.get("address", ""),
-        "spots": data.get("spots", []),
-    })
-
-_rag_thread = None
-
-def rag_init(request):
-    global _rag_thread
-
-    st = rag_service.get_rag_status()
-    if st.get("state") in ("building", "ready"):
-        return JsonResponse(st)
-
-    def runner():
-        try:
-            rag_service.initialize_rag()
-        except Exception:
-            pass
-
-    _rag_thread = threading.Thread(target=runner, daemon=True)
-    _rag_thread.start()
-
-    return JsonResponse(rag_service.get_rag_status())
-
-def rag_progress(request):
-    return JsonResponse(rag_service.get_rag_status())
-
-def rag_recommend(request):
-    answers = request.session.get("answers", {})
-    result = _get_rag_recommendation(answers)
-    request.session["result"] = result
-    request.session["step"] = 100
-    request.session.modified = True
-    return JsonResponse({"ok": True, "redirect_url": reverse("chat")})
 

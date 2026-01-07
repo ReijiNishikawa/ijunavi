@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マイページ</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body class="app-page">
+    <div id="app" class="app-shell">
+  <header class="app-header">
+    <div class="app-logo app-logo--small">
+      <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
+    </div>
+  </header>
+
+  <main class="app-main">
+    <section class="app-card">
+      {% if messages %}
+        <ul class="message-list">
+          {% for message in messages %}
+            <li class="message-list__item">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <div class="profile-card">
+        <h1 class="profile-title">マイページ</h1>
+        <div class="profile-avatar">
+          {% if user.icon %}
+            <img src="{{ user.icon.url }}" alt="プロフィール画像">
+          {% else %}
+            <img src="{% static 'img/image.png' %}" alt="プロフィール画像（未設定）">
+          {% endif %}
+        </div>
+        <div class="profile-info">
+          <dl>
+            <div>
+              <dt>ユーザー名</dt>
+              <dd>{{ user.username|default:"未設定" }}</dd>
+            </div>
+            <div>
+              <dt>メールアドレス</dt>
+              <dd>{{ user.email }}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="profile-actions">
+        <a href="{% url 'profile_edit' %}" class="button login-button">プロフィール編集</a>
+        <a href="{% url 'logout' %}" class="button signup-button">ログアウト</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+      <nav aria-label="ボトムタブ">
+        <ul class="bottom-nav">
+          <li><a href="{% url 'chat' %}">chat</a></li>
+          <li><a href="{% url 'mypage' %}" aria-current="page">my page</a></li>
+          <li><a href="{% url 'bookmark' %}">bookmark</a></li>
+        </ul>
+      </nav>
+    </footer>
+    </div>
+</body>
+</html>

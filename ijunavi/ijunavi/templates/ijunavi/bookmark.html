@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブックマーク</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body class="app-page">
+    <div id="app" class="app-shell">
+  <header class="app-header">
+    <div class="app-logo">
+      <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
+    </div>
+    <h1>ブックマーク</h1>
+  </header>
+  
+
+  <main class="app-main">
+    <section class="app-card">
+      {% if bookmarks and bookmarks|length > 0 %}
+        <ul class="bookmark-list">
+          {% for bm in bookmarks %}
+            <li class="bookmark-item">
+              <pre>
+【地図サムネイル】{{ bm.title|default:"施設名" }}
+住所：{{ bm.address|default:"東京都○○区…" }}
+保存日時：{{ bm.saved_at|default:"（未記録）" }}
+[詳細]
+              </pre>
+              <form method="post" action="{% url 'bookmark_remove' %}" class="bookmark-form">
+                {% csrf_token %}
+                <input type="hidden" name="index" value="{{ forloop.counter0 }}">
+                <button type="submit" class="button signup-button">ブックマーク解除</button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>ブックマークはありません。</p>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <nav aria-label="ボトムタブ">
+      <ul class="bottom-nav">
+        <li><a href="{% url 'chat' %}">chat</a></li>
+        <li><a href="{% url 'mypage' %}">my page</a></li>
+        <li><a href="{% url 'bookmark' %}" aria-current="page">bookmark</a></li>
+      </ul>
+    </nav>
+  </footer>
+    </div>
+</body>
+</html>
