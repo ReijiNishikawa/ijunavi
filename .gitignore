@@ -39,3 +39,12 @@ chroma_db/
 rag_handson/
 chroma_db/
 rag_handson/
+/.chroma_db/
+/.chroma_db/*
+# Chroma のベクトルDBは全部 Git 管理外にする
+.chroma_db/
+.chroma/
+*/.chroma_db/
+*/.chroma/
+
+.env

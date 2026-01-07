@@ -15,9 +15,9 @@ from langchain.chains import RetrievalQA
 # 環境変数をロード (APIキーなど)
 # Django起動時に読み込まれることを想定
 # Djangoプロジェクトのルートディレクトリ（manage.py がある場所）
-load_dotenv()
+BASE_DIR = settings.BASE_DIR
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 # 設定 ーーー
 DATA_DIR = BASE_DIR / "rag_handson"          # ★ここを修正
