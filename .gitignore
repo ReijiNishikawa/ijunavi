@@ -37,7 +37,7 @@ db.sqlite3
 chroma_db/
 .env
 rag_handson/
-chroma_db/
+.chroma_db/
 rag_handson/
 /.chroma_db/
 /.chroma_db/*
@@ -46,5 +46,3 @@ rag_handson/
 .chroma/
 */.chroma_db/
 */.chroma/
-
-.env

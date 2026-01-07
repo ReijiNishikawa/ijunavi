@@ -5,6 +5,10 @@ from django.http import Http404
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+import re
+import threading
+from django.http import JsonResponse
+from django.urls import reverse
 
 # 🚨 RAGサービスから回答生成関数をインポート
 from . import rag_service 
@@ -42,9 +46,9 @@ def _get_rag_recommendation(answers):
     age = answers.get("age")
     style = answers.get("style", "")
     climate = answers.get("climate", "")
-    family =answers.get("family","")
-    a_else =answers.get("else","")
-    # ユーザーの回答を統合したプロンプトを作成
+    family = answers.get("family", "")
+    a_else = answers.get("else", "")
+
     prompt = f"""
     私の年齢は{age}歳です。
     家族構成は{family}です。
@@ -52,17 +56,25 @@ def _get_rag_recommendation(answers):
     また{a_else}も考慮してください。
     これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
     """
-    
-    # rag_service.py に定義された回答生成関数を呼び出す
+
     try:
+        # RAG実行
         recommendation_result = rag_service.generate_recommendation(prompt)
+
+        # headline から住所を抽出して map_address に格納
+        headline = recommendation_result.get("headline", "")
+        map_address = extract_address_from_headline(headline)
+        recommendation_result["map_address"] = map_address
+
         return recommendation_result
+
     except Exception as e:
-        # RAGサービスが失敗した場合のフォールバック
         print(f"RAGサービス呼び出しエラー: {e}")
+        headline = "【エラー】情報取得に失敗しました"
         return {
-            "headline": "【エラー】情報取得に失敗しました",
+            "headline": headline,
             "spots": ["システムエラーが発生しました。詳細はサーバーログを確認してください。"],
+            "map_address": extract_address_from_headline(headline),
         }
     
 # --- chat_view ---
@@ -96,37 +108,107 @@ def chat_view(request):
             return redirect("chat")
 
         # 送信ロジック
-        elif action == "send" and chat_active and step >= 0 and step < len(QUESTIONS):
+        elif action == "send" and chat_active and 0 <= step < len(QUESTIONS):
+            is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            bot_messages = []
+
             user_msg = _normalize(request.POST.get("message"))
             if user_msg:
                 messages.append({"role": "user", "text": user_msg})
-
                 qkey = QUESTIONS[step]["key"]
-                
-                # 年齢のバリデーション (簡易版)
+
+                # 1️⃣ 年齢
                 if qkey == "age":
                     age_val = _int_from_text(user_msg)
                     if age_val is None:
-                        messages.append({"role": "bot", "text": "年齢を数字で入力してください。"})
-                    else:
-                        answers[qkey] = age_val
-                        step += 1
+                        msg = "よくわかりません。年齢を数字で入力してください。"
+                        messages.append({"role": "bot", "text": msg})
+                        request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                        if is_ajax:
+                            return JsonResponse({"ok": True, "bot_messages": [msg]})
+                        return redirect("chat")
+                    answers[qkey] = age_val
+                    step += 1
+
+                # 2️⃣ style
+                elif qkey == "style":
+                    allowed = ["自然", "都市", "バランス"]
+                    if user_msg not in allowed:
+                        msg = "よくわかりません。「自然」「都市」「バランス」から選んでください。"
+                        messages.append({"role": "bot", "text": msg})
+                        request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                        if is_ajax:
+                            return JsonResponse({"ok": True, "bot_messages": [msg]})
+                        return redirect("chat")
+                    answers[qkey] = user_msg
+                    step += 1
+
+                # 3️⃣ climate
+                elif qkey == "climate":
+                    allowed = ["暖かい", "涼しい", "こだわらない"]
+                    if user_msg not in allowed:
+                        msg = "よくわかりません。「暖かい」「涼しい」「こだわらない」から選んでください。"
+                        messages.append({"role": "bot", "text": msg})
+                        request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                        if is_ajax:
+                            return JsonResponse({"ok": True, "bot_messages": [msg]})
+                        return redirect("chat")
+                    answers[qkey] = user_msg
+                    step += 1
+
+                # 4️⃣ family
+                elif qkey == "family":
+                    if not user_msg:
+                        msg = "よくわかりません。家族構成を簡単に教えてください。"
+                        messages.append({"role": "bot", "text": msg})
+                        request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                        if is_ajax:
+                            return JsonResponse({"ok": True, "bot_messages": [msg]})
+                        return redirect("chat")
+                    answers[qkey] = user_msg
+                    step += 1
+
+                # 5️⃣ else
                 else:
                     answers[qkey] = user_msg
                     step += 1
 
                 # 次の質問 or 結果表示
                 if step < len(QUESTIONS):
-                    messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
+                    next_q = QUESTIONS[step]["ask"]
+                    messages.append({"role": "bot", "text": next_q})
+                    bot_messages.append(next_q)
                 else:
-                    # 🚨 RAGサービスから結果を取得
-                    result = _get_rag_recommendation(answers) 
-                    messages.append({"role": "bot", "text": "ありがとうございます。条件に合う候補を用意しました。"})
-                    step = 100 # 結果表示段階
+                    # 🚨RAG実行（ここが重いのでローディングが効く）
+                    # ここでは結果を作らない（進捗表示のため）
+                    done_msg = "おすすめを作成中です…（しばらくお待ちください）"
+                    messages.append({"role": "bot", "text": done_msg})
+                    bot_messages.append(done_msg)
 
-                request.session.update({
-                    "messages": messages, "step": step, "answers": answers, "result": result
-                })
+                    result = None
+                    step = 99  # 作成中ステータスとして使う
+
+                request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
+
+                if is_ajax:
+                    if step == 99:
+                        return JsonResponse({
+                            "ok": True,
+                            "bot_messages": bot_messages,
+                            "need_rag_progress": True,
+                            "init_url": reverse("rag_init"),
+                            "progress_url": reverse("rag_progress"),
+                            "recommend_url": reverse("rag_recommend"),
+                        })
+                    return JsonResponse({"ok": True, "bot_messages": bot_messages})
+
+            # 空送信など
+            if is_ajax:
+                return JsonResponse({"ok": False})
             return redirect("chat")
 
         # リセットロジック
@@ -221,24 +303,114 @@ def bookmark_remove(request):
 @login_required
 def bookmark_add(request):
     """ブックマーク追加（POST）"""
-    if request.method == "POST":
-        title = request.POST.get("title", "").strip()
-        address = request.POST.get("address", "").strip()
-        detail_url = request.POST.get("detail_url", "").strip()
-
-        if not title:
-            # タイトルがない場合は無視
-            return redirect("bookmark")
-
-        bookmarks = _get_bookmarks(request)
-        bookmarks.append({
-            "title": title or "(タイトル未設定)",
-            "address": address or "",
-            "detail_url": detail_url or "",
-            "saved_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
-        })
-        request.session["bookmarks"] = bookmarks
-        request.session.modified = True
+    if request.method != "POST":
         return redirect("bookmark")
+
+    title = request.POST.get("title", "").strip()
+    address = request.POST.get("address", "").strip()
+
+    spots_raw = request.POST.get("spots", "")
+    spots = [s for s in spots_raw.split("|||") if s.strip()] if spots_raw else []
+
+    if not title:
+        return redirect("bookmark")
+
+    bookmarks = _get_bookmarks(request)
+
+    # sessionの配列indexを使って detail_url を作る（追加後の番号）
+    new_index = len(bookmarks)
+    detail_url = f"/bookmark/detail/{new_index}/"
+
+    bookmarks.append({
+        "title": title or "(タイトル未設定)",
+        "address": address or "",
+        "spots": spots,  # ★これがないと詳細で落ちる
+        "detail_url": detail_url,
+        "saved_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
+    })
+
+    request.session["bookmarks"] = bookmarks
+    request.session.modified = True
     return redirect("bookmark")
+
+def extract_address_from_headline(headline: str) -> str:
+    """
+    RAG の見出しテキストから地図用の住所を取り出す。
+    例:
+      最も推奨する地域は「南城市（沖縄県）」です。
+      → 沖縄県南城市
+    """
+
+    if not headline:
+        return ""
+
+    # まず「〜」の中身を取る（「南城市（沖縄県）」など）
+    m = re.search(r'「(.+?)」', headline)
+    if m:
+        name = m.group(1).strip()  # '南城市（沖縄県）'
+
+        # 「市（県）」のようなパターンを分解
+        m2 = re.match(r'(.+)[(（](.+?)[)）]', name)
+        if m2:
+            city = m2.group(1).strip()   # 南城市
+            pref = m2.group(2).strip()   # 沖縄県
+            return f"{pref}{city}"       # 沖縄県南城市
+
+        # かっこが無ければそのまま住所として使う
+        return name
+
+    # 「」が無い場合は「○○県○○市」パターンを探す
+    m = re.search(r'(..[都道府県].+?[市区町村])', headline)
+    if m:
+        return m.group(1).strip()
+
+    # 何も取れなかったら、念のため全文を返す
+    return headline.strip()
+
+@login_required
+def bookmark_detail(request, index):
+    bookmarks = _get_bookmarks(request)
+
+    try:
+        index = int(index)
+        data = bookmarks[index]
+    except:
+        raise Http404("ブックマークが存在しません")
+
+    return render(request, "ijunavi/bookmark_detail.html", {
+        "title": data.get("title", ""),
+        "address": data.get("address", ""),
+        "spots": data.get("spots", []),
+    })
+
+_rag_thread = None
+
+def rag_init(request):
+    global _rag_thread
+
+    st = rag_service.get_rag_status()
+    if st.get("state") in ("building", "ready"):
+        return JsonResponse(st)
+
+    def runner():
+        try:
+            rag_service.initialize_rag()
+        except Exception:
+            pass
+
+    _rag_thread = threading.Thread(target=runner, daemon=True)
+    _rag_thread.start()
+
+    return JsonResponse(rag_service.get_rag_status())
+
+def rag_progress(request):
+    return JsonResponse(rag_service.get_rag_status())
+
+def rag_recommend(request):
+    answers = request.session.get("answers", {})
+    result = _get_rag_recommendation(answers)
+    request.session["result"] = result
+    request.session["step"] = 100
+    request.session.modified = True
+    return JsonResponse({"ok": True, "redirect_url": reverse("chat")})
 

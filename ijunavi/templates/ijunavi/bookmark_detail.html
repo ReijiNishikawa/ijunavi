@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ブックマーク詳細</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+    <style>
+      #result-map {
+        width: 100%;
+        height: 300px;
+        border-radius: 16px;
+      }
+    </style>
+</head>
+
+<body class="app-page chat-page">
+  <div id="app" class="app-shell">
+
+    <header class="app-header">
+      <div class="app-logo">
+        <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
+      </div>
+      <h1>いじゅナビ</h1>
+    </header>
+
+    <main class="app-main">
+      <section class="app-card chat-card" aria-label="ブックマーク詳細">
+        <div class="chat-result">
+          <h2>{{ title }}</h2>
+
+          <!-- 地図 -->
+          <div class="chat-map">
+            <div id="result-map" data-address="{{ address }}"></div>
+          </div>
+
+          <!-- スポット情報 -->
+          <h3>スポット情報</h3>
+          <div class="chat-spots">
+            {% for s in spots %}
+              <div>{{ s }}</div>
+            {% empty %}
+              <div>スポット情報は保存されていません。</div>
+            {% endfor %}
+          </div>
+
+          <p class="chat-link">
+            <a href="{% url 'bookmark' %}">← ブックマーク一覧へ戻る</a>
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <nav aria-label="ボトムタブ">
+        <ul class="bottom-nav">
+          <li><a href="{% url 'chat' %}">chat</a></li>
+          <li><a href="/mypage/">my page</a></li>
+          <li><a href="{% url 'bookmark' %}" aria-current="page">bookmark</a></li>
+        </ul>
+      </nav>
+    </footer>
+  </div>
+
+  <script>
+  function initMap() {
+    const mapElement = document.getElementById("result-map");
+    if (!mapElement) return;
+
+    const address = mapElement.dataset.address;
+    const defaultCenter = { lat: 35.681236, lng: 139.767125 };
+
+    const map = new google.maps.Map(mapElement, {
+      center: defaultCenter,
+      zoom: 5,
+    });
+
+    if (!address) {
+      console.warn("住所が指定されていません");
+      return;
+    }
+
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ address: address }, function(results, status) {
+      if (status === "OK" && results[0]) {
+        const loc = results[0].geometry.location;
+        map.setCenter(loc);
+        map.setZoom(11);
+
+        new google.maps.Marker({
+          map: map,
+          position: loc,
+          title: address,
+        });
+      } else {
+        console.error("Geocode failed: " + status);
+      }
+    });
+  }
+  </script>
+
+  <!-- ★ chat.html と“完全に同じ”キーに必ず変更する -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGXd3I891Z_bk821cyKVx4o70AIan45L0&callback=initMap"
+    async
+    defer
+  ></script>
+</body>
+</html>
