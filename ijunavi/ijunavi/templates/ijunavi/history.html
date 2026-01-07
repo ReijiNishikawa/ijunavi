@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>いじゅナビ｜履歴</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body class="app-page">
+  <div id="app" class="app-shell">
+    <header class="app-header">
+      <div class="app-logo">
+        <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
+      </div>
+      <h1>チャット履歴</h1>
+    </header>
+
+    <main class="app-main">
+      <section class="app-card">
+        {% if messages %}
+          <div class="chat-log">
+            <ul>
+              {% for m in messages %}
+                <li class="chat-message chat-message--{{ m.role }}">
+                  <span class="chat-message__role">{{ m.role }}：</span>
+                  <span class="chat-message__text">{{ m.text }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% else %}
+          <p>履歴はまだありません。</p>
+        {% endif %}
+        <p class="chat-link"><a href="{% url 'chat' %}">チャットへ戻る</a></p>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <nav aria-label="ボトムタブ">
+        <ul class="bottom-nav">
+          <li><a href="{% url 'chat' %}">chat</a></li>
+          <li><a href="{% url 'mypage' %}">my page</a></li>
+          <li><a href="{% url 'bookmark' %}">bookmark</a></li>
+        </ul>
+      </nav>
+    </footer>
+  </div>
+</body>
+</html>
