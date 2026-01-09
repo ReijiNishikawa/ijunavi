@@ -402,4 +402,17 @@ input[type="email"],input[type="password"] {
   animation: spin 0.9s linear infinite;
 }
 
+/* 改行（\n）をそのまま表示して見やすくする */
+.chat-pre {
+  white-space: pre-wrap !important;
+  word-break: break-word;
+  line-height: 1.7;
+}
+
+/* スポット一覧の行間も少し整える（任意） */
+.chat-spots__line {
+  margin: 0.25rem 0;
+}
+
+
 @keyframes spin { to { transform: rotate(360deg); } }
