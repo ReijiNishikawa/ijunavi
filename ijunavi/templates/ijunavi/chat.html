@@ -59,12 +59,41 @@
               </div>
 
               <!-- RAGからのスポット一覧表示 -->
-              <div class="chat-spots">
-                {% for line in result.spots %}
-                  <div>{{ line }}</div>
-                {% endfor %}
+              <div class="chat-result-box">
+              <div class="result-section">
+                <div class="result-title">結論</div>
+                <div class="result-body chat-pre">{{ result.parsed.conclusion }}</div>
               </div>
 
+              <div class="result-section">
+                <div class="result-title">理由1</div>
+                <div class="result-body chat-pre">{{ result.parsed.reason1 }}</div>
+              </div>
+
+              <div class="result-section">
+                <div class="result-title">理由2</div>
+                <div class="result-body chat-pre">{{ result.parsed.reason2 }}</div>
+              </div>
+
+              {% if result.parsed.reason3 %}
+              <div class="result-section">
+                <div class="result-title">理由3</div>
+                <div class="result-body chat-pre">{{ result.parsed.reason3 }}</div>
+              </div>
+              {% endif %}
+
+              <div class="result-section">
+                <div class="result-title">補足・アドバイス</div>
+                <div class="result-body chat-pre">{{ result.parsed.advice }}</div>
+              </div>
+
+              {% if result.parsed.refs %}
+              <div class="result-section">
+                <div class="result-title">参照情報</div>
+                <div class="result-body chat-pre">{{ result.parsed.refs }}</div>
+              </div>
+              {% endif %}
+            </div>
               <p class="chat-link">
                 <a href="{% url 'history' %}">履歴をみる</a>
               </p>
@@ -84,7 +113,7 @@
                   {% for m in messages %}
                     <li class="chat-message chat-message--{{ m.role }}">
                       <span class="chat-message__role">{{ m.role }}：</span>
-                      <span class="chat-message__text">{{ m.text }}</span>
+                      <span class="chat-message__text chat-pre">{{ m.text }}</span>
                     </li>
                   {% endfor %}
                 </ul>

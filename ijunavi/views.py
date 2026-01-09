@@ -335,6 +335,51 @@ def bookmark_add(request):
     request.session.modified = True
     return redirect("bookmark")
 
+def _parse_rag_blocks(text: str) -> dict:
+    """
+    RAGの出力（1つの長文）から、結論/理由1/理由2/補足/参照情報を抽出してdictで返す。
+    """
+    text = _format_rag_text(text)
+
+    def pick(pattern: str):
+        m = re.search(pattern, text, flags=re.DOTALL)
+        return m.group(1).strip() if m else ""
+
+    parsed = {
+        "conclusion": pick(r"■結論[:：]?\s*(.*?)(?=\n\s*■理由1|\n\s*■理由２|\n\s*■理由2|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
+        "reason1": pick(r"■理由1.*?\n(.*?)(?=\n\s*■理由2|\n\s*■理由２|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
+        "reason2": pick(r"■理由2.*?\n(.*?)(?=\n\s*■理由3|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
+        "reason3": pick(r"■理由3.*?\n(.*?)(?=\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
+        "advice": pick(r"■補足・アドバイス\s*\n(.*?)(?=\n\s*---\s*参照情報\s*---|\Z)"),
+        "refs": pick(r"---\s*参照情報\s*---\s*\n(.*?)(?=\Z)"),
+    }
+    return parsed
+
+def _format_rag_text(s: str) -> str:
+    if not isinstance(s, str):
+        return s
+
+    # 文字としての \n を本物の改行へ
+    s = s.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n")
+
+    # 「■」の前に入っている余計なスペースを軽く整理
+    s = re.sub(r"[ \t\u3000]*■", "■", s)
+
+    # 重要：理由/補足/結論/参照情報の「前」を強制的に段落化
+    # 例: "です。■理由2(...)" → "です。\n\n■理由2(...)"
+    s = re.sub(r"(?<!\n)■結論", r"\n\n■結論", s)
+    s = re.sub(r"(?<!\n)■理由(\d+)", r"\n\n■理由\1", s)
+    s = re.sub(r"(?<!\n)■補足・アドバイス", r"\n\n■補足・アドバイス", s)
+    s = re.sub(r"(?<!\n)---\s*参照情報\s*---", r"\n\n--- 参照情報 ---", s)
+
+    # 「参照元」の行も見やすく（必要なら）
+    s = re.sub(r"(?<!\n)\[参照元\]", r"\n[参照元]", s)
+
+    # 連続改行は最大2つに
+    s = re.sub(r"\n{3,}", "\n\n", s)
+
+    return s.strip()
+
 def extract_address_from_headline(headline: str) -> str:
     """
     RAG の見出しテキストから地図用の住所を取り出す。
@@ -411,8 +456,22 @@ def rag_progress(request):
 def rag_recommend(request):
     answers = request.session.get("answers", {})
     result = _get_rag_recommendation(answers)
+
+    if isinstance(result, dict):
+        if isinstance(result.get("headline"), str):
+            result["headline"] = _format_rag_text(result["headline"])
+
+        if isinstance(result.get("spots"), list):
+            result["spots"] = [
+                (_format_rag_text(s) if isinstance(s, str) else s)
+                for s in result["spots"]
+            ]
+
+            # ★spotsが1本の長文前提で、最初の要素をパース対象にする
+            if result["spots"]:
+                result["parsed"] = _parse_rag_blocks(result["spots"][0])
+
     request.session["result"] = result
     request.session["step"] = 100
     request.session.modified = True
     return JsonResponse({"ok": True, "redirect_url": reverse("chat")})
-
