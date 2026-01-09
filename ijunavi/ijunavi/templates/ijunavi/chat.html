@@ -1,15 +1,21 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チャット</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>チャット</title>
+
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap"
+    rel="stylesheet"
+  >
 </head>
+
 <body class="app-page chat-page">
   <div id="app" class="app-shell">
 
@@ -22,47 +28,68 @@
 
     <main class="app-main">
       <section class="app-card chat-card" aria-label="チャット">
+
         {% if not chat_active %}
-          <!-- 初期画面：開始／履歴 -->
           <div class="chat-intro">
             <h2>チャットでおすすめの街を探す</h2>
             <p>いくつかの質問に答えるだけで、あなたに合った街をご提案します。</p>
           </div>
+
           <form method="post" class="chat-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="start">
-            <button type="submit" class="button login-button">チャットボットを開始</button>
+            <button type="submit" class="button login-button">
+              チャットボットを開始
+            </button>
           </form>
-          <p class="chat-link"><a href="{% url 'history' %}">履歴をみる</a></p>
+
+          <p class="chat-link">
+            <a href="{% url 'history' %}">履歴をみる</a>
+          </p>
 
         {% else %}
+
           {% if step == 100 and result %}
             <!-- 質問完了：おすすめ表示 -->
             <div class="chat-result">
               <h2>{{ result.headline }}</h2>
-              <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
+
+              <form
+                method="post"
+                action="{% url 'bookmark_add' %}"
+                class="chat-form"
+                style="margin-bottom: 1rem;"
+              >
                 {% csrf_token %}
                 <input type="hidden" name="title" value="{{ result.headline }}">
                 <input type="hidden" name="address" value="">
                 <input type="hidden" name="detail_url" value="">
-                <button type="submit" class="button signup-button">この提案をブックマーク</button>
+                <button type="submit" class="button signup-button">
+                  この提案をブックマーク
+                </button>
               </form>
+
               <div class="chat-map">
                 <p>[ 地図表示（プレースホルダ） ]</p>
                 <p>※地図やピンはCSS/画像を追加すると再現できます</p>
               </div>
+
               <div class="chat-spots">
                 {% for line in result.spots %}
                   <div>{{ line }}</div>
                 {% endfor %}
               </div>
+
               <p class="chat-link">
                 <a href="{% url 'history' %}">履歴をみる</a>
               </p>
+
               <form method="post" class="chat-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="reset">
-                <button type="submit" class="button signup-button">最初からやり直す</button>
+                <button type="submit" class="button signup-button">
+                  最初からやり直す
+                </button>
               </form>
             </div>
 
@@ -73,41 +100,87 @@
                 <ul>
                   {% for m in messages %}
                     <li class="chat-message chat-message--{{ m.role }}">
-                      <span class="chat-message__role">{{ m.role }}：</span>
-                      <span class="chat-message__text">{{ m.text }}</span>
+                      <span class="chat-message__role">
+                        {{ m.role }}：
+                      </span>
+                      <span class="chat-message__text">
+                        {{ m.text }}
+                      </span>
                     </li>
                   {% endfor %}
                 </ul>
               {% endif %}
             </section>
 
-            <section aria-label="入力欄" class="chat-input">
-              <form method="post" class="chat-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="send">
-                <input type="text" name="message" placeholder="メッセージを入力">
-                <button type="submit" class="button login-button">送信</button>
-              </form>
-            </section>
+            {% if chat_active and step >= 0 and step < 100 %}
 
-            <section class="chat-reset">
-              <form method="post" class="chat-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="reset">
-                <button type="submit" class="button signup-button">終了してリセット</button>
-              </form>
-            </section>
+              {% if question_data and question_data.choices %}
+                <section aria-label="選択肢" class="chat-input">
+                  <form method="post" class="chat-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="send">
+
+                    {% for c in question_data.choices %}
+                      <button
+                        type="submit"
+                        name="choice"
+                        value="{{ c }}"
+                        class="button login-button"
+                      >
+                        {{ c }}
+                      </button>
+                    {% endfor %}
+                  </form>
+                </section>
+
+              {% else %}
+                <section aria-label="入力欄" class="chat-input">
+                  <form method="post" class="chat-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="send">
+                    <input
+                      type="text"
+                      name="message"
+                      placeholder="メッセージを入力"
+                    >
+                    <button type="submit" class="button login-button">
+                      送信
+                    </button>
+                  </form>
+                </section>
+              {% endif %}
+
+              <section class="chat-reset">
+                <form method="post" class="chat-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="reset">
+                  <button type="submit" class="button signup-button">
+                    終了してリセット
+                  </button>
+                </form>
+              </section>
+
+            {% endif %}
           {% endif %}
         {% endif %}
+
       </section>
     </main>
 
     <footer class="app-footer">
       <nav aria-label="ボトムタブ">
         <ul class="bottom-nav">
-          <li><a href="{% url 'chat' %}" aria-current="page">chat</a></li>
-          <li><a href="/mypage/">my page</a></li>
-          <li><a href="/bookmark/">bookmark</a></li>
+          <li>
+            <a href="{% url 'chat' %}" aria-current="page">chat</a>
+          </li>
+
+          {% if user.is_authenticated %}
+            <li><a href="/mypage/">my page</a></li>
+            <li><a href="/bookmark/">bookmark</a></li>
+          {% else %}
+            <li><a href="{% url 'signup' %}">sign up</a></li>
+            <li><a href="{% url 'login' %}">login</a></li>
+          {% endif %}
         </ul>
       </nav>
     </footer>

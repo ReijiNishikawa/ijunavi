@@ -19,7 +19,7 @@ from langchain.schema import Document
 BASE_DIR = settings.BASE_DIR
 
 # 環境変数をロード
-load_dotenv(BASE_DIR / ".env")
+load_dotenv('.env')
 
 # === 設定 ===
 DATA_DIR = BASE_DIR / "ijunavi" / "data" / "rag_handson" / "data"

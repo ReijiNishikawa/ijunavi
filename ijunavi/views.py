@@ -32,6 +32,7 @@ QUESTIONS = [
     {"key": "else", "ask": "その他の条件を入力してください", "choices": []},
 ]
 
+
 def _normalize(s: str) -> str:
     return (s or "").strip()
 
@@ -78,7 +79,6 @@ def _get_rag_recommendation(answers):
         }
     
 # --- chat_view ---
-
 def chat_view(request):
     chat_active = request.session.get("chat_active", False)
     messages = request.session.get("messages", [])
@@ -166,6 +166,7 @@ def chat_view(request):
         "answers": answers,
         "result": result,
     })
+
 
 # --- mainブランチ側の基本ビュー関数を統合 ---
 
