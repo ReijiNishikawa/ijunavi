@@ -233,51 +233,13 @@
       });
     })();
   </script>
-    <script>
-    function initMap() {
-      const mapElement = document.getElementById("result-map");
-      if (!mapElement) return;
 
-      // Django から埋め込んだ住所（例：沖縄県南城市）
-      const address = mapElement.dataset.address;
-
-      // 初期表示は日本全体寄り
-      const defaultCenter = { lat: 35.681236, lng: 139.767125 };
-
-      const map = new google.maps.Map(mapElement, {
-        center: defaultCenter,
-        zoom: 5,
-      });
-
-      if (!address) {
-        console.warn("住所が指定されていません");
-        return;
-      }
-
-      const geocoder = new google.maps.Geocoder();
-
-      geocoder.geocode({ address: address }, function(results, status) {
-        if (status === "OK" && results[0]) {
-          const loc = results[0].geometry.location;
-          map.setCenter(loc);
-          map.setZoom(11);
-
-          new google.maps.Marker({
-            map: map,
-            position: loc,
-            title: address,
-          });
-        } else {
-          console.error("Geocode failed: " + status);
-        }
-      });
-    }
-  </script>
 
   <!-- ★YOUR_API_KEY をあなたのキーに置き換える -->
+  <script src="{% static 'js/map.js' %}" defer></script>
+
   <script
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGXd3I891Z_bk821cyKVx4o70AIan45L0&callback=initMap"
-    async
     defer
   ></script>
   <script>
