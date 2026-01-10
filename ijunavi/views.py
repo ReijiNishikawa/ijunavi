@@ -93,7 +93,6 @@ def _validate_choice(q: dict, user_msg: str):
     if user_msg in choices:
         return True, user_msg
 
-    # 選択肢の見せ方を統一
     pretty = "」「".join(choices)
     return False, f"よくわかりません。「{pretty}」から選んでください。"
 
@@ -109,7 +108,6 @@ def _get_rag_recommendation(answers):
     child_grade = answers.get("child_grade", "")
     a_else = answers.get("else", "")
 
-    # 子供がいる時だけ学年を含める
     child_line = ""
     if family == "子供がいる" and child_grade:
         child_line = f"子供の学年は「{child_grade}」です。"
@@ -151,20 +149,35 @@ def chat_view(request):
     answers = request.session.get("answers", {})
     result = request.session.get("result")
 
+    display_name = (
+        request.user.username
+        if request.user.is_authenticated and request.user.username
+        else "あなた"
+    )
+    BOT_NAME = "いじゅナビ"
+
+    def add_bot(msg_list, text):
+        msg_list.append({"role": "bot", "sender": BOT_NAME, "text": text})
+
+    def add_user(msg_list, text):
+        msg_list.append({"role": "user", "sender": display_name, "text": text})
+
     if request.method == "POST":
         action = request.POST.get("action")
 
         # 開始
         if action == "start":
             chat_active = True
-            messages_sess = [{"role": "bot", "text": msg} for msg in INITIAL_BOT_MESSAGES]
+            messages_sess = []
             answers = {}
             result = None
 
-            # 最初の質問を condition 対応で決める
+            for msg in INITIAL_BOT_MESSAGES:
+                add_bot(messages_sess, msg)
+
             step, q = get_next_question(0, answers)
             if q:
-                messages_sess.append({"role": "bot", "text": q["ask"]})
+                add_bot(messages_sess, q["ask"])
             else:
                 step = 100
 
@@ -188,8 +201,7 @@ def chat_view(request):
                     return JsonResponse({"ok": False})
                 return redirect("chat")
 
-            # ユーザー発言を保存
-            messages_sess.append({"role": "user", "text": user_msg})
+            add_user(messages_sess, user_msg)
 
             q = _get_question_by_step(step)
             if not q:
@@ -204,51 +216,49 @@ def chat_view(request):
                 age_val = _int_from_text(user_msg)
                 if age_val is None:
                     msg = "よくわかりません。年齢を数字で入力してください。"
-                    messages_sess.append({"role": "bot", "text": msg})
+                    add_bot(messages_sess, msg)
                     request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
                     if is_ajax:
                         return JsonResponse({"ok": True, "bot_messages": [msg]})
                     return redirect("chat")
                 answers[qkey] = age_val
 
-            # choices がある質問（style/climate/family）は共通で検証
+            # choices 質問
             elif "choices" in q:
                 ok, val_or_msg = _validate_choice(q, user_msg)
                 if not ok:
                     msg = val_or_msg
-                    messages_sess.append({"role": "bot", "text": msg})
+                    add_bot(messages_sess, msg)
                     request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
                     if is_ajax:
                         return JsonResponse({"ok": True, "bot_messages": [msg]})
                     return redirect("chat")
                 answers[qkey] = val_or_msg
 
-            # child_grade / else など自由入力
+            # 自由入力
             else:
                 answers[qkey] = user_msg
 
             # 次の質問へ（condition を考慮してスキップ）
             next_step, next_q = get_next_question(step + 1, answers)
 
-            # まだ質問がある
             if next_q:
                 step = next_step
-                messages_sess.append({"role": "bot", "text": next_q["ask"]})
+                add_bot(messages_sess, next_q["ask"])
                 bot_messages.append(next_q["ask"])
-                request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
 
+                request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
                 if is_ajax:
                     return JsonResponse({"ok": True, "bot_messages": bot_messages})
                 return redirect("chat")
 
-            # 質問終了 → RAGへ（重いので進捗表示）
+            # 質問終了 → RAGへ
             done_msg = "おすすめを作成中です…（しばらくお待ちください）"
-            messages_sess.append({"role": "bot", "text": done_msg})
+            add_bot(messages_sess, done_msg)
             bot_messages.append(done_msg)
 
             result = None
-            step = 99  # 作成中ステータス
-
+            step = 99
             request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
 
             if is_ajax:
@@ -425,7 +435,7 @@ def extract_address_from_headline(headline: str) -> str:
 
     m = re.search(r'「(.+?)」', headline)
     if m:
-        name = m.group(1).strip()  # '南城市（沖縄県）'
+        name = m.group(1).strip()
 
         m2 = re.match(r'(.+)[(（](.+?)[)）]', name)
         if m2:
