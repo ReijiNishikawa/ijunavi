@@ -40,16 +40,7 @@
           {% if step == 100 and result %}
             <!-- 質問完了：おすすめ表示 -->
             <div class="chat-result">
-              <h2>{{ result.headline }}</h2>
-
-              <!-- ブックマークフォーム -->
-              <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
-                {% csrf_token %}
-                <input type="hidden" name="title" value="{{ result.headline }}">
-                <input type="hidden" name="address" value="{{ result.map_address }}">
-                <input type="hidden" name="spots" value="{{ result.spots|join:'|||'}}">
-                <button type="submit" class="button signup-button">この提案をブックマーク</button>
-              </form>
+              <h2>{{ result.headline }}</h2>              
 
               <!-- ★Googleマップを表示するエリア -->
               <div class="chat-map">
@@ -60,11 +51,6 @@
 
               <!-- RAGからのスポット一覧表示 -->
               <div class="chat-result-box">
-              <div class="result-section">
-                <div class="result-title">結論</div>
-                <div class="result-body chat-pre">{{ result.parsed.conclusion }}</div>
-              </div>
-
               <div class="result-section">
                 <div class="result-title">理由1</div>
                 <div class="result-body chat-pre">{{ result.parsed.reason1 }}</div>
@@ -97,6 +83,15 @@
               <p class="chat-link">
                 <a href="{% url 'history' %}">履歴をみる</a>
               </p>
+
+            <!-- ブックマークフォーム -->
+              <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
+                {% csrf_token %}
+                <input type="hidden" name="title" value="{{ result.headline }}">
+                <input type="hidden" name="address" value="{{ result.map_address }}">
+                <input type="hidden" name="spots" value="{{ result.spots|join:'|||'}}">
+                <button type="submit" class="button signup-button">この提案をブックマーク</button>
+              </form>
 
               <form method="post" class="chat-form">
                 {% csrf_token %}
