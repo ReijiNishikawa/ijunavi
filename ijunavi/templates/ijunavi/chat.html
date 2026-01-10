@@ -107,7 +107,9 @@
                 <ul>
                   {% for m in messages %}
                     <li class="chat-message chat-message--{{ m.role }}">
-                      <span class="chat-message__role">{{ m.sender|default:m.role }}：</span>
+                      <span class="chat-message__role">
+                        {{ m.sender|default:m.role }}：
+                      </span>
                       <span class="chat-message__text chat-pre">{{ m.text }}</span>
                     </li>
                   {% endfor %}
@@ -269,8 +271,15 @@
 
     const li = document.createElement("li");
     li.className = `chat-message chat-message--${role}`;
-    li.innerHTML = `<span class="chat-message__role">${role}：</span>
-                    <span class="chat-message__text"></span>`;
+
+    // Django側のログイン名をJSへ渡す（未ログインは「あなた」）
+    const USER_NAME = "{{ user.username|default:'あなた' }}";
+    const BOT_NAME = "いじゅナビ";
+
+    const label = (role === "bot") ? BOT_NAME : USER_NAME;
+
+    li.innerHTML = `<span class="chat-message__role">${label}：</span>
+                    <span class="chat-message__text chat-pre"></span>`;
     li.querySelector(".chat-message__text").textContent = text;
     ul.appendChild(li);
 
