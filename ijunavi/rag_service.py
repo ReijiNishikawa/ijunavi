@@ -6,6 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import traceback
 import threading
+import re
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -15,23 +16,15 @@ from langchain.chains import RetrievalQA
 from django.conf import settings
 from langchain.schema import Document
 
-# プロジェクトルート（manage.py がある場所）
 BASE_DIR = settings.BASE_DIR
-
-# 環境変数をロード
 load_dotenv(BASE_DIR / ".env")
 
-# === 設定 ===
 DATA_DIR = BASE_DIR / "ijunavi" / "data" / "rag_handson" / "data"
-DB_DIR   = BASE_DIR / ".chroma_db" / "migration"
+DB_DIR = BASE_DIR / ".chroma_db" / "migration"
 
-# 使うCSVを固定（ホワイトリスト）
 ALLOWED_CSV = {"2024人口.csv", "2024医療.csv", "2024居住.csv", "2024教育.csv", "tenpo2511.csv"}
-
-# CSV更新検知用（DB内に保存）
 FINGERPRINT_PATH = DB_DIR / "_fingerprint.json"
 
-# グローバル変数としてQAチェーンを保持
 qa_chain = None
 
 RAG_STATUS = {
@@ -44,13 +37,16 @@ RAG_STATUS = {
 }
 RAG_LOCK = threading.Lock()
 
+
 def get_rag_status():
     with RAG_LOCK:
         return dict(RAG_STATUS)
 
+
 def _set_status(**kwargs):
     with RAG_LOCK:
         RAG_STATUS.update(kwargs)
+
 
 def csv_df_to_grouped_docs(df: pd.DataFrame, source_name: str, group_rows: int = 800) -> list[Document]:
     docs = []
@@ -67,22 +63,20 @@ def csv_df_to_grouped_docs(df: pd.DataFrame, source_name: str, group_rows: int =
         )
     return docs
 
+
 def compute_data_fingerprint() -> dict:
     items = []
     for p in DATA_DIR.rglob("*.csv"):
         if p.name not in ALLOWED_CSV:
             continue
         stat = p.stat()
-        items.append({
-            "name": p.name,
-            "size": stat.st_size,
-            "mtime": int(stat.st_mtime),
-        })
+        items.append({"name": p.name, "size": stat.st_size, "mtime": int(stat.st_mtime)})
     items.sort(key=lambda x: x["name"])
     payload = {"files": items}
     raw = json.dumps(payload, sort_keys=True).encode("utf-8")
     payload["hash"] = hashlib.sha256(raw).hexdigest()
     return payload
+
 
 def load_saved_fingerprint() -> dict | None:
     try:
@@ -92,9 +86,11 @@ def load_saved_fingerprint() -> dict | None:
         return None
     return None
 
+
 def save_fingerprint(fp: dict) -> None:
     os.makedirs(DB_DIR, exist_ok=True)
     FINGERPRINT_PATH.write_text(json.dumps(fp, ensure_ascii=False, indent=2), encoding="utf-8")
+
 
 def _read_csv_safely(path: Path, **kwargs) -> pd.DataFrame:
     try:
@@ -102,15 +98,12 @@ def _read_csv_safely(path: Path, **kwargs) -> pd.DataFrame:
     except UnicodeDecodeError:
         return pd.read_csv(str(path), low_memory=False, encoding="cp932", **kwargs)
 
+
 def load_tenpo2511_as_long_df(path: Path) -> pd.DataFrame:
     df = _read_csv_safely(path, header=2)
 
     if len(df.columns) >= 2:
         df = df.rename(columns={df.columns[0]: "year", df.columns[1]: "timing"})
-
-    for col in ["合計", "集計日", "year", "timing"]:
-        if col not in df.columns:
-            pass
 
     id_cols = [c for c in ["year", "timing", "集計日"] if c in df.columns]
     if not id_cols:
@@ -141,6 +134,7 @@ def load_tenpo2511_as_long_df(path: Path) -> pd.DataFrame:
 
     return long_df[["year", "timing", "date", "prefecture", "store_count"]]
 
+
 def tenpo_long_df_to_docs(long_df: pd.DataFrame, source_name: str, group_rows: int = 1200) -> list[Document]:
     docs = []
     total = len(long_df)
@@ -148,12 +142,12 @@ def tenpo_long_df_to_docs(long_df: pd.DataFrame, source_name: str, group_rows: i
         end = min(start + group_rows, total)
         part = long_df.iloc[start:end]
 
+        # ★「具体的な店舗数」を書かせない前提なので、ドキュメント側も数値を落とした文にする
         lines = []
         for _, r in part.iterrows():
-            sc = int(r["store_count"]) if pd.notna(r["store_count"]) else r["store_count"]
             lines.append(
-                f"スーパー店舗数。{r['year']} {r['timing']}（集計日 {r['date']}）"
-                f"{r['prefecture']}の店舗数は{sc}。"
+                f"スーパー店舗に関するデータ。{r['year']} {r['timing']}（集計日 {r['date']}）"
+                f"{r['prefecture']}の状況が含まれる。"
             )
 
         docs.append(
@@ -164,7 +158,7 @@ def tenpo_long_df_to_docs(long_df: pd.DataFrame, source_name: str, group_rows: i
         )
     return docs
 
-# --- RAG初期化関連の関数 ---
+
 def load_and_split_documents():
     if not DATA_DIR.exists():
         print(f"RAGエラー: データディレクトリ '{DATA_DIR.resolve()}' が見つかりません。")
@@ -200,6 +194,7 @@ def load_and_split_documents():
     chunks = splitter.split_documents(docs)
     print(f"RAG: {len(chunks)} 個のチャンクに分割されました。")
     return chunks
+
 
 def initialize_vectorstore(chunks):
     openai_key = os.getenv("OPENAI_API_KEY")
@@ -289,6 +284,7 @@ def initialize_vectorstore(chunks):
     print("RAG: ベクトルDBの作成と保存が完了しました。")
     return vectorstore
 
+
 def setup_qa_chain(vectorstore):
     try:
         openai_key = os.getenv("OPENAI_API_KEY")
@@ -307,31 +303,39 @@ def setup_qa_chain(vectorstore):
 
         retriever = vectorstore.as_retriever(
             search_type="mmr",
-            search_kwargs={
-                "k": 4,
-                "fetch_k": 10,
-                "lambda_mult": 0.5
-            },
+            search_kwargs={"k": 4, "fetch_k": 10, "lambda_mult": 0.5},
         )
 
         template = """あなたは地方移住の専門家です。
-        提供されたコンテキスト情報のみを使用して、ユーザーの質問に回答してください。
-        回答は必ず以下の【出力形式】に従って作成してください。
-        【出力形式】を維持しつつ、各理由のブロック（理由1、理由2など）の間には、必ず1行の空行を入れて読みやすくしてください。
-        【出力形式】
-        ■結論：(地域名と要約)
-        ■理由1（参照：[ファイル名]）
-        (その地域を推奨する具体的な理由)
-        ■理由2（参照：[ファイル名]）
-        (別の観点からの理由)
-        ■補足・アドバイス
-        (注意点など)
-        コンテキスト:
-        {context}
-        質問:
-        {question}
-        """
+提供されたコンテキスト情報のみを使用して、ユーザーの質問に回答してください。
+推測や一般論で補わず、根拠は必ずコンテキストに含まれる情報から書いてください。
 
+【必須ルール】
+- 出力は必ず【出力形式】を厳密に守ってください。
+- 理由1・理由2・理由3は必ず出してください（省略禁止）。
+- 各理由ブロックの間には必ず1行の空行を入れてください。
+- 結論は「地域名だけ」を書いてください（要約は書かない）。
+- 結論の地域名は必ず「○○都/道/府/県○○市/区/町/村」まで書いてください。
+- 店舗数・病院数・人口など、具体的な数値は書かないでください（多い/充実などの定性的表現にする）。
+- 特殊文字は使用しないで下さい。
+
+【出力形式】
+■結論：(地域名のみ。例：大分県宇佐市)
+■理由1（参照：[ファイル名]）
+(その地域を推奨する具体的な理由)
+■理由2（参照：[ファイル名]）
+(別の観点からの理由)
+■理由3（参照：[ファイル名]）
+(別の観点からの理由)
+■補足・アドバイス
+(注意点など)
+
+コンテキスト:
+{context}
+
+質問:
+{question}
+"""
         prompt = PromptTemplate.from_template(template)
 
         qa_chain_instance = RetrievalQA.from_chain_type(
@@ -341,12 +345,12 @@ def setup_qa_chain(vectorstore):
             chain_type_kwargs={"prompt": prompt},
             return_source_documents=True
         )
-
         return qa_chain_instance
 
     except Exception as e:
         print(f"RAG: QAチェーンのセットアップに失敗しました。エラー: {e}")
         return None
+
 
 def initialize_rag():
     global qa_chain
@@ -377,8 +381,32 @@ def initialize_rag():
         print(f"RAG初期化中の致命的なエラー: {e}")
         traceback.print_exc()
         qa_chain = None
-
+        _set_status(
+            state="error",
+            total=0,
+            current=0,
+            percent=0,
+            message="RAG初期化に失敗しました。",
+            error=str(e)
+        )
     return qa_chain
+
+
+def _extract_conclusion_place(answer: str) -> str:
+    """
+    answer から「■結論：(大分県宇佐市)」の中身だけを取り出す
+    """
+    if not isinstance(answer, str):
+        return ""
+
+    m = re.search(r"■結論[:：]?\s*[（(]\s*([^）)\n]+)\s*[）)]", answer)
+    if m:
+        return m.group(1).strip()
+
+    # フォールバック：都道府県 + 市区町村
+    m2 = re.search(r"((?:..[都道府県])(?:[^ \n　]+?[市区町村]))", answer)
+    return m2.group(1).strip() if m2 else ""
+
 
 def generate_recommendation(prompt: str) -> dict:
     global qa_chain
@@ -393,30 +421,12 @@ def generate_recommendation(prompt: str) -> dict:
     try:
         result = qa_chain.invoke({"query": prompt})
         answer = result.get("result", "情報が不足しているため、具体的な提案ができません。")
-        sources = result.get("source_documents", [])
 
-        lines = answer.split('\n', 1)
-        headline = lines[0].strip() if lines else "AIによる移住先提案"
-        full_answer_body = lines[1].strip() if len(lines) > 1 else headline
-
-        spots = [full_answer_body]
-
-        if sources:
-            spots.append("\n--- 参照情報 ---")
-            seen_sources = set()
-            count = 0
-            for doc in sources:
-                src = Path(doc.metadata.get("source", "不明")).name
-                if src not in seen_sources:
-                    spots.append(f"【参照元】{src}")
-                    seen_sources.add(src)
-                    count += 1
-                    if count >= 3:
-                        break
-
+        # ★ headline を「地域名だけ」に統一
+        place = _extract_conclusion_place(answer) or "提案結果"
         return {
-            "headline": headline,
-            "spots": spots,
+            "headline": place,   # ← ここは「大分県宇佐市」だけになる
+            "spots": [answer],   # views.py 側がここから reason1/2/3 を解析する
         }
 
     except Exception as e:

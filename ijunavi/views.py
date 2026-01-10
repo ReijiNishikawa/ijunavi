@@ -10,11 +10,9 @@ import re
 import threading
 from django.http import JsonResponse
 from django.urls import reverse
+import os
 
-# 🚨 RAGサービスから回答生成関数をインポート
 from . import rag_service
-
-# accountsアプリからProfileFormをインポート（mainブランチ側の追加）
 from accounts.forms import ProfileForm
 
 
@@ -38,7 +36,6 @@ QUESTIONS = [
     {"key": "family", "ask": "家族構成は？",
      "choices": ["単身", "夫婦のみ", "子供がいる"]},
 
-    # ★ 子供がいる場合のみ聞く質問（通常はスキップ）
     {"key": "child_grade", "ask": "お子さんは何年生ですか？（例：小3 / 中1 / 高2 など）",
      "condition": {"family": "子供がいる"}},
 
@@ -93,7 +90,122 @@ def _validate_choice(q: dict, user_msg: str):
     return False, f"よくわかりません。「{pretty}」から選んでください。"
 
 
+def _format_rag_text(s: str) -> str:
+    if not isinstance(s, str):
+        return s
+
+    s = s.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n")
+    s = re.sub(r"[ \t\u3000]*■", "■", s)
+
+    s = re.sub(r"(?<!\n)■結論", r"\n\n■結論", s)
+    s = re.sub(r"(?<!\n)■理由(\d+)", r"\n\n■理由\1", s)
+    s = re.sub(r"(?<!\n)■補足・アドバイス", r"\n\n■補足・アドバイス", s)
+    s = re.sub(r"(?<!\n)---\s*参照情報\s*---", r"\n\n--- 参照情報 ---", s)
+
+    s = re.sub(r"(?<!\n)\[参照元\]", r"\n[参照元]", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+
+    return s.strip()
+
+def _extract_place_from_conclusion_text(text: str) -> str:
+    """
+    ■結論の中身から「○○都道府県○○市区町村」だけを返す
+    例: "(大分県宇佐市)" -> "大分県宇佐市"
+        "大分県宇佐市 住みやすい" -> "大分県宇佐市"
+    """
+    if not text:
+        return ""
+
+    # ( ) or （ ）の中身があれば優先
+    m = re.search(r"[（(]\s*([^）)\n]+)\s*[）)]", text)
+    if m:
+        candidate = m.group(1).strip()
+    else:
+        candidate = text.strip()
+
+    # 先頭の「都道府県 + 市区町村」だけを抜く
+    m2 = re.search(r"((?:..[都道府県])(?:[^ \n　]+?[市区町村]))", candidate)
+    return m2.group(1).strip() if m2 else candidate
+
+
+def _parse_rag_blocks(text: str) -> dict:
+    text = _format_rag_text(text)
+
+    def pick(pattern: str):
+        m = re.search(pattern, text, flags=re.DOTALL)
+        return m.group(1).strip() if m else ""
+
+    parsed = {
+        "conclusion": pick(r"■結論[:：]?\s*(.*?)(?=\n\s*■理由1|\n\s*■理由２|\n\s*■理由2|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
+        "reason1": pick(r"■理由1.*?\n(.*?)(?=\n\s*■理由2|\n\s*■理由２|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
+        "reason2": pick(r"■理由2.*?\n(.*?)(?=\n\s*■理由3|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
+        "reason3": pick(r"■理由3.*?\n(.*?)(?=\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
+        "advice": pick(r"■補足・アドバイス\s*\n(.*?)(?=\n\s*---\s*参照情報\s*---|\Z)"),
+        "refs": pick(r"---\s*参照情報\s*---\s*\n(.*?)(?=\Z)"),
+    }
+
+    # ★理由3が必ず出るようにする（空なら埋める）
+    if not parsed["reason3"]:
+        if parsed["reason2"]:
+            parsed["reason3"] = parsed["reason2"]
+        elif parsed["reason1"]:
+            parsed["reason3"] = parsed["reason1"]
+        else:
+            parsed["reason3"] = "理由3の情報が取得できませんでした。別の条件でもう一度お試しください。"
+
+    # ★結論から「都道府県 + 市区町村」だけを抽出して保持
+    parsed["conclusion_place"] = _extract_place_from_conclusion_text(parsed.get("conclusion", ""))
+
+    return parsed
+
+
+def extract_address_from_headline(headline: str) -> str:
+    if not headline:
+        return ""
+
+    m = re.search(r'「(.+?)」', headline)
+    if m:
+        name = m.group(1).strip()
+
+        m2 = re.match(r'(.+)[(（](.+?)[)）]', name)
+        if m2:
+            city = m2.group(1).strip()
+            pref = m2.group(2).strip()
+            return f"{pref}{city}"
+
+        return name
+
+    m = re.search(r'(..[都道府県].+?[市区町村])', headline)
+    if m:
+        return m.group(1).strip()
+
+    return headline.strip()
+
+
+def format_headline_display(headline: str) -> str:
+    """
+    表示用：必ず「○○県○○市/区/町/村」だけにする
+    """
+    if not headline:
+        return ""
+
+    # 「」の中があれば優先
+    m = re.search(r'「(.+?)」', headline)
+    s = m.group(1).strip() if m else headline.strip()
+
+    # ■結論：( ... ) の形なら括弧中身
+    m2 = re.search(r"■結論[:：]?\s*[（(](.+?)[）)]", s)
+    if m2:
+        s = m2.group(1).strip()
+
+    # 先頭の都道府県 + 市区町村だけ
+    m3 = re.search(r"((?:..[都道府県])(?:[^ \n　]+?[市区町村]))", s)
+    return m3.group(1).strip() if m3 else s
+
 def _get_rag_recommendation(answers):
+    """
+    RAGサービスを呼び出し、ユーザーの回答に基づいて移住先を提案する。
+    """
     age = answers.get("age")
     style = answers.get("style", "")
     climate = answers.get("climate", "")
@@ -101,45 +213,60 @@ def _get_rag_recommendation(answers):
     hospital = answers.get("hospital", "")
     child_grade = answers.get("child_grade", "")
     a_else = answers.get("else", "")
-
+    # 子供がいる時だけ学年を含める
     child_line = ""
     if family == "子供がいる" and child_grade:
         child_line = f"子供の学年は「{child_grade}」です。"
-
     prompt = f"""
 私の年齢は{age}歳です。
 家族構成は{family}です。
 {child_line}
 理想の暮らしは「{style}」で、好きな気候は「{climate}」です。
-子供の学年は「{child_grade}」なので学校が必要だと判断した場合学校が多い地区を選定してください。
-通院頻度は「{hospital}」なので必要な場合病院がある地区を選定してください。
-また{a_else}も考慮してください。
+通院頻度は「{hospital}」です。
+その他の条件：{a_else}
 
-これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
+【スーパーに関する要望（重要）】
+- tenpo2511.csv の情報をもとに、提案地域および周辺地域の「スーパーの多さ」「日常の買い物のしやすさ」を説明してください。
+- 具体的な店舗数や数値は一切書かないでください。
+- 「○店舗」「店舗数」「数字」が含まれる表現は禁止です。
+- 「比較的多い」「買い物に困りにくい」などの定性的な表現のみを使ってください。
 
-必ずこの形式で出力してください。
-■結論：(地域名と要約)
-■理由1（参照：[ファイル名]）
-(具体的理由)
-■理由2（参照：[ファイル名]）
-(具体的理由)
-■理由3（参照：[ファイル名]）
-(具体的理由)
+【子育て・医療に関する条件】
+- 子供の学年は「{child_grade}」です。学校が必要だと判断した場合、学校が多い地区を優先してください。
+- 必要だと判断した場合、医療機関へのアクセスが良い地区を優先してください。
+
+これらの条件に最も合う地方移住先を1つだけ提案し、その地域について説明してください。
+
+【必須出力形式】
+■結論：(必ず「○○都/道/府/県○○市/区/町/村」のみを書く。要約文は入れない)
+■理由1
+(スーパー・買い物環境について必ず触れる。数値は禁止)
+■理由2
+(別の観点の理由)
+■理由3
+(別の観点の理由)
 ■補足・アドバイス
 (注意点など)
---- 参照情報 ---
-(参照情報)
 
-回答をそのまま出力するため、特殊文字は使用しないで下さい。
-内容の種類ごとに改行をするようにしてください。
+回答はそのまま画面に表示されます。
+特殊文字は使用せず、内容の区切りごとに改行してください。
 """.strip()
 
     try:
         recommendation_result = rag_service.generate_recommendation(prompt)
 
-        headline = recommendation_result.get("headline", "")
-        map_address = extract_address_from_headline(headline)
-        recommendation_result["map_address"] = map_address
+        headline = recommendation_result.get("headline", "") or ""
+        headline = _format_rag_text(headline)
+
+        # ★表示用（都道府県○○市の○○）
+        recommendation_result["headline"] = headline
+        recommendation_result["headline_display"] = format_headline_display(headline)
+
+        # map は display を優先
+        recommendation_result["map_address"] = (
+            recommendation_result["headline_display"]
+            or extract_address_from_headline(headline)
+        )
 
         return recommendation_result
 
@@ -148,8 +275,10 @@ def _get_rag_recommendation(answers):
         headline = "【エラー】情報取得に失敗しました"
         return {
             "headline": headline,
+            "headline_display": headline,
             "spots": ["システムエラーが発生しました。詳細はサーバーログを確認してください。"],
             "map_address": extract_address_from_headline(headline),
+            "source_files": [],
         }
 
 
@@ -180,7 +309,6 @@ def chat_view(request):
     if request.method == "POST":
         action = request.POST.get("action")
 
-        # 開始
         if action == "start":
             chat_active = True
             messages_sess = []
@@ -205,7 +333,6 @@ def chat_view(request):
             })
             return redirect("chat")
 
-        # 送信
         elif action == "send" and chat_active and 0 <= step < len(QUESTIONS):
             is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
             bot_messages = []
@@ -287,7 +414,6 @@ def chat_view(request):
                 })
             return redirect("chat")
 
-        # リセット
         elif action == "reset":
             for k in ("chat_active", "messages", "step", "answers", "result"):
                 if k in request.session:
@@ -403,75 +529,6 @@ def bookmark_add(request):
     return redirect("bookmark")
 
 
-def _parse_rag_blocks(text: str) -> dict:
-    text = _format_rag_text(text)
-
-    def pick(pattern: str):
-        m = re.search(pattern, text, flags=re.DOTALL)
-        return m.group(1).strip() if m else ""
-
-    parsed = {
-        "conclusion": pick(r"■結論[:：]?\s*(.*?)(?=\n\s*■理由1|\n\s*■理由２|\n\s*■理由2|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
-        "reason1": pick(r"■理由1.*?\n(.*?)(?=\n\s*■理由2|\n\s*■理由２|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
-        "reason2": pick(r"■理由2.*?\n(.*?)(?=\n\s*■理由3|\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
-        "reason3": pick(r"■理由3.*?\n(.*?)(?=\n\s*■補足・アドバイス|\n\s*---\s*参照情報\s*---|\Z)"),
-        "advice": pick(r"■補足・アドバイス\s*\n(.*?)(?=\n\s*---\s*参照情報\s*---|\Z)"),
-        "refs": pick(r"---\s*参照情報\s*---\s*\n(.*?)(?=\Z)"),
-    }
-
-    # ★理由3が必ず出るようにする（空なら埋める）
-    if not parsed["reason3"]:
-        if parsed["reason2"]:
-            parsed["reason3"] = parsed["reason2"]
-        elif parsed["reason1"]:
-            parsed["reason3"] = parsed["reason1"]
-        else:
-            parsed["reason3"] = "理由3の情報が取得できませんでした。別の条件でもう一度お試しください。"
-
-    return parsed
-
-
-def _format_rag_text(s: str) -> str:
-    if not isinstance(s, str):
-        return s
-
-    s = s.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\r\n", "\n")
-    s = re.sub(r"[ \t\u3000]*■", "■", s)
-
-    s = re.sub(r"(?<!\n)■結論", r"\n\n■結論", s)
-    s = re.sub(r"(?<!\n)■理由(\d+)", r"\n\n■理由\1", s)
-    s = re.sub(r"(?<!\n)■補足・アドバイス", r"\n\n■補足・アドバイス", s)
-    s = re.sub(r"(?<!\n)---\s*参照情報\s*---", r"\n\n--- 参照情報 ---", s)
-
-    s = re.sub(r"(?<!\n)\[参照元\]", r"\n[参照元]", s)
-    s = re.sub(r"\n{3,}", "\n\n", s)
-
-    return s.strip()
-
-
-def extract_address_from_headline(headline: str) -> str:
-    if not headline:
-        return ""
-
-    m = re.search(r'「(.+?)」', headline)
-    if m:
-        name = m.group(1).strip()
-
-        m2 = re.match(r'(.+)[(（](.+?)[)）]', name)
-        if m2:
-            city = m2.group(1).strip()
-            pref = m2.group(2).strip()
-            return f"{pref}{city}"
-
-        return name
-
-    m = re.search(r'(..[都道府県].+?[市区町村])', headline)
-    if m:
-        return m.group(1).strip()
-
-    return headline.strip()
-
-
 @login_required
 def bookmark_detail(request, index):
     bookmarks = _get_bookmarks(request)
@@ -528,9 +585,31 @@ def rag_recommend(request):
                 (_format_rag_text(s) if isinstance(s, str) else s)
                 for s in result["spots"]
             ]
-
             if result["spots"]:
                 result["parsed"] = _parse_rag_blocks(result["spots"][0])
+                place = result["parsed"].get("conclusion_place", "")
+                if place:
+                    result["headline_display"] = place
+                    result["map_address"] = place
+
+                # ★結論からmap_addressを作る（headlineより確実）
+                conc = result["parsed"].get("conclusion", "")
+                if conc:
+                    # 例：「岐阜県岐阜市 ～」から先頭だけ使う
+                    conc_head = re.split(r"[、,：:\n]", conc)[0].strip()
+                    result["map_address"] = conc_head
+
+        # headline_display が無ければ作る（保険）
+        if not result.get("headline_display"):
+            result["headline_display"] = format_headline_display(result.get("headline", ""))
+
+        # map_address が無ければ作る（保険）
+        if not result.get("map_address"):
+            result["map_address"] = result["headline_display"] or extract_address_from_headline(result.get("headline", ""))
+
+        # source_files が無ければ空（保険）
+        if "source_files" not in result:
+            result["source_files"] = []
 
     request.session["result"] = result
     request.session["step"] = 100

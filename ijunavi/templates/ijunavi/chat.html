@@ -38,14 +38,10 @@
 
         {% else %}
           {% if step == 100 and result %}
-            <!-- 質問完了：おすすめ表示 -->
             <div class="chat-result">
-              <h2>{{ result.headline }}</h2>              
-
+              <h2>■結論：{{ result.map_address }}</h2>
               <div class="chat-map">
-                <div id="result-map"
-                    data-address="{{ result.map_address|default:result.headline }}">
-                </div>
+                <div id="result-map" data-address="{{ result.map_address }}"></div>
               </div>
 
               <div class="chat-result-box">
@@ -67,14 +63,7 @@
                 <div class="result-section">
                   <div class="result-title">補足・アドバイス</div>
                   <div class="result-body chat-pre">{{ result.parsed.advice }}</div>
-                </div>
-
-                {% if result.parsed.refs %}
-                <div class="result-section">
-                  <div class="result-title">参照情報</div>
-                  <div class="result-body chat-pre">{{ result.parsed.refs }}</div>
-                </div>
-                {% endif %}
+                </div>        
               </div>
 
               <p class="chat-link">
@@ -83,7 +72,7 @@
 
               <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
                 {% csrf_token %}
-                <input type="hidden" name="title" value="{{ result.headline }}">
+                <input type="hidden" name="title" value="{{ result.parsed.conclusion_place|default:result.headline_display|default:result.headline }}">
                 <input type="hidden" name="address" value="{{ result.map_address }}">
                 <input type="hidden" name="spots" value="{{ result.spots|join:'|||'}}">
                 <button type="submit" class="button signup-button">この提案をブックマーク</button>
@@ -97,7 +86,6 @@
             </div>
 
           {% else %}
-            <!-- 質問途中：チャットログ＋入力 -->
             <section aria-label="チャットログ" class="chat-log">
               {% if messages %}
                 <ul>
@@ -113,7 +101,6 @@
               {% endif %}
             </section>
 
-            <!-- ★ 選択肢ボタンUI（choicesがある時だけ表示） -->
             <section class="chat-choices" id="chat-choices" style="display:none;">
               <div class="chat-choices__inner" id="chat-choices-inner"></div>
             </section>
@@ -138,7 +125,6 @@
         {% endif %}
       </section>
 
-      <!-- ローディング（RAG実行中に表示） -->
       <div id="loading-overlay" class="loading-overlay" style="display:none;">
         <div class="loading-box">
           <div class="spinner"></div>
@@ -172,7 +158,6 @@
 
   </div>
 
-  <!-- スクロール保持（そのまま） -->
   <script>
     (function() {
       var pageScrollKey = "chatPageScrollY";
@@ -236,7 +221,6 @@
     defer
   ></script>
 
-  <!-- ★ 送信処理 + choicesボタン生成 -->
   <script>
 (function(){
   const form = document.getElementById("chat-send-form");
@@ -421,11 +405,9 @@
     }
   }
 
-  // 初期表示（サーバー側で current_choices を渡している想定）
   const initialChoices = {{ current_choices|default:"[]"|safe }};
   renderChoices(initialChoices);
 
-  // テキスト送信（自由入力用）
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
