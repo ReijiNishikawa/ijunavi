@@ -31,6 +31,9 @@ QUESTIONS = [
     {"key": "climate", "ask": "好きな気候は？",
      "choices": ["暖かい", "涼しい", "こだわらない"]},
 
+    {"key": "hospital", "ask": "通院頻度は？",
+     "choices": ["1か月に一回以上","通院していない"]},
+
     {"key": "family", "ask": "家族構成は？",
      "choices": ["単身", "夫婦のみ", "子供がいる"]},
 
@@ -105,18 +108,20 @@ def _get_rag_recommendation(answers):
     style = answers.get("style", "")
     climate = answers.get("climate", "")
     family = answers.get("family", "")
+    hospital = answers.get("hospital", "")
     child_grade = answers.get("child_grade", "")
     a_else = answers.get("else", "")
-
+    # 子供がいる時だけ学年を含める
     child_line = ""
     if family == "子供がいる" and child_grade:
         child_line = f"子供の学年は「{child_grade}」です。"
-
     prompt = f"""
 私の年齢は{age}歳です。
 家族構成は{family}です。
 {child_line}
 理想の暮らしは「{style}」で、好きな気候は「{climate}」です。
+子供の学年は「{child_grade}」なので学校が必要だと判断した場合学校が多い地区を選定してください。
+通院頻度は「{hospital}」なので必要な場合病院がある地区を選定してください。
 また{a_else}も考慮してください。
 これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
 回答をそのまま出力するため、特殊文字は使用しないで下さい。
