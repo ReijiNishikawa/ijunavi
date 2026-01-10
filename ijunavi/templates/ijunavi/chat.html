@@ -83,7 +83,9 @@
                 <ul>
                   {% for m in messages %}
                     <li class="chat-message chat-message--{{ m.role }}">
-                      <span class="chat-message__role">{{ m.role }}：</span>
+                      <span class="chat-message__role">
+                        {{ m.sender|default:m.role }}：
+                      </span>
                       <span class="chat-message__text">{{ m.text }}</span>
                     </li>
                   {% endfor %}

@@ -87,6 +87,21 @@ def chat_view(request):
     step = request.session.get("step", -1) # -1:未開始, 0..質問index, 100:結果表示
     answers = request.session.get("answers", {})
     result = request.session.get("result")
+    display_name = (
+        request.user.username
+        if request.user.is_authenticated and request.user.username
+        else "あなた"
+    )
+
+    BOT_NAME = "いじゅナビ"
+
+    def add_bot(messages, text):
+        messages.append({
+            "role": "bot",
+            "sender": BOT_NAME,
+            "text": text
+        })
+
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -94,9 +109,13 @@ def chat_view(request):
         # 開始ロジック 
         if action == "start":
             chat_active = True
-            messages = [{"role": "bot", "text": msg} for msg in INITIAL_BOT_MESSAGES]
+            messages = []
+            for msg in INITIAL_BOT_MESSAGES:
+                add_bot(messages, msg)
+
             step = 0
-            messages.append({"role": "bot", "text": QUESTIONS[step]["ask"]})
+            add_bot(messages, QUESTIONS[step]["ask"])
+            
             answers = {}
             result = None
             
@@ -116,7 +135,11 @@ def chat_view(request):
 
             user_msg = _normalize(request.POST.get("message"))
             if user_msg:
-                messages.append({"role": "user", "text": user_msg})
+                messages.append({
+                    "role": "user",
+                    "sender": display_name,
+                    "text": user_msg
+                })
                 qkey = QUESTIONS[step]["key"]
 
                 # 1️⃣ 年齢
@@ -124,7 +147,7 @@ def chat_view(request):
                     age_val = _int_from_text(user_msg)
                     if age_val is None:
                         msg = "よくわかりません。年齢を数字で入力してください。"
-                        messages.append({"role": "bot", "text": msg})
+                        add_bot(messages, msg)
                         request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
 
                         if is_ajax:
@@ -138,7 +161,7 @@ def chat_view(request):
                     allowed = ["自然", "都市", "バランス"]
                     if user_msg not in allowed:
                         msg = "よくわかりません。「自然」「都市」「バランス」から選んでください。"
-                        messages.append({"role": "bot", "text": msg})
+                        add_bot(messages, msg)
                         request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
 
                         if is_ajax:
@@ -152,7 +175,7 @@ def chat_view(request):
                     allowed = ["暖かい", "涼しい", "こだわらない"]
                     if user_msg not in allowed:
                         msg = "よくわかりません。「暖かい」「涼しい」「こだわらない」から選んでください。"
-                        messages.append({"role": "bot", "text": msg})
+                        add_bot(messages, msg)
                         request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
 
                         if is_ajax:
@@ -165,7 +188,7 @@ def chat_view(request):
                 elif qkey == "family":
                     if not user_msg:
                         msg = "よくわかりません。家族構成を簡単に教えてください。"
-                        messages.append({"role": "bot", "text": msg})
+                        add_bot(messages, msg)
                         request.session.update({"messages": messages, "step": step, "answers": answers, "result": result})
 
                         if is_ajax:
