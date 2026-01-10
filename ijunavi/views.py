@@ -161,7 +161,7 @@ def chat_view(request):
             answers = {}
             result = None
 
-            # 最初の質問を condition 対応で決める（念のため）
+            # 最初の質問を condition 対応で決める
             step, q = get_next_question(0, answers)
             if q:
                 messages_sess.append({"role": "bot", "text": q["ask"]})
@@ -199,7 +199,7 @@ def chat_view(request):
 
             qkey = q["key"]
 
-            # 1) age は数字強制
+            # age は数字強制
             if qkey == "age":
                 age_val = _int_from_text(user_msg)
                 if age_val is None:
@@ -211,7 +211,7 @@ def chat_view(request):
                     return redirect("chat")
                 answers[qkey] = age_val
 
-            # 2) choicesがある質問（style/climate/family）は共通で検証
+            # choices がある質問（style/climate/family）は共通で検証
             elif "choices" in q:
                 ok, val_or_msg = _validate_choice(q, user_msg)
                 if not ok:
@@ -223,11 +223,11 @@ def chat_view(request):
                     return redirect("chat")
                 answers[qkey] = val_or_msg
 
-            # 3) child_grade / else など自由入力
+            # child_grade / else など自由入力
             else:
                 answers[qkey] = user_msg
 
-            # 次の質問へ（conditionを考慮してスキップ）
+            # 次の質問へ（condition を考慮してスキップ）
             next_step, next_q = get_next_question(step + 1, answers)
 
             # まだ質問がある
