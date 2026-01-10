@@ -42,49 +42,45 @@
             <div class="chat-result">
               <h2>{{ result.headline }}</h2>              
 
-              <!-- ★Googleマップを表示するエリア -->
               <div class="chat-map">
                 <div id="result-map"
                     data-address="{{ result.map_address|default:result.headline }}">
                 </div>
               </div>
 
-              <!-- RAGからのスポット一覧表示 -->
               <div class="chat-result-box">
-              <div class="result-section">
-                <div class="result-title">理由1</div>
-                <div class="result-body chat-pre">{{ result.parsed.reason1 }}</div>
+                <div class="result-section">
+                  <div class="result-title">理由1</div>
+                  <div class="result-body chat-pre">{{ result.parsed.reason1 }}</div>
+                </div>
+
+                <div class="result-section">
+                  <div class="result-title">理由2</div>
+                  <div class="result-body chat-pre">{{ result.parsed.reason2 }}</div>
+                </div>
+
+                <div class="result-section">
+                  <div class="result-title">理由3</div>
+                  <div class="result-body chat-pre">{{ result.parsed.reason3 }}</div>
+                </div>
+
+                <div class="result-section">
+                  <div class="result-title">補足・アドバイス</div>
+                  <div class="result-body chat-pre">{{ result.parsed.advice }}</div>
+                </div>
+
+                {% if result.parsed.refs %}
+                <div class="result-section">
+                  <div class="result-title">参照情報</div>
+                  <div class="result-body chat-pre">{{ result.parsed.refs }}</div>
+                </div>
+                {% endif %}
               </div>
 
-              <div class="result-section">
-                <div class="result-title">理由2</div>
-                <div class="result-body chat-pre">{{ result.parsed.reason2 }}</div>
-              </div>
-
-              {% if result.parsed.reason3 %}
-              <div class="result-section">
-                <div class="result-title">理由3</div>
-                <div class="result-body chat-pre">{{ result.parsed.reason3 }}</div>
-              </div>
-              {% endif %}
-
-              <div class="result-section">
-                <div class="result-title">補足・アドバイス</div>
-                <div class="result-body chat-pre">{{ result.parsed.advice }}</div>
-              </div>
-
-              {% if result.parsed.refs %}
-              <div class="result-section">
-                <div class="result-title">参照情報</div>
-                <div class="result-body chat-pre">{{ result.parsed.refs }}</div>
-              </div>
-              {% endif %}
-            </div>
               <p class="chat-link">
                 <a href="{% url 'history' %}">履歴をみる</a>
               </p>
 
-            <!-- ブックマークフォーム -->
               <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
                 {% csrf_token %}
                 <input type="hidden" name="title" value="{{ result.headline }}">
@@ -117,7 +113,12 @@
               {% endif %}
             </section>
 
-            <section aria-label="入力欄" class="chat-input">
+            <!-- ★ 選択肢ボタンUI（choicesがある時だけ表示） -->
+            <section class="chat-choices" id="chat-choices" style="display:none;">
+              <div class="chat-choices__inner" id="chat-choices-inner"></div>
+            </section>
+
+            <section aria-label="入力欄" class="chat-input" id="chat-input">
               <form method="post" class="chat-form" id="chat-send-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="send">
@@ -136,6 +137,7 @@
           {% endif %}
         {% endif %}
       </section>
+
       <!-- ローディング（RAG実行中に表示） -->
       <div id="loading-overlay" class="loading-overlay" style="display:none;">
         <div class="loading-box">
@@ -169,8 +171,9 @@
   </footer>
 
   </div>
-    <script>
-    // Keep viewport/chat log from jumping after submitting chat forms
+
+  <!-- スクロール保持（そのまま） -->
+  <script>
     (function() {
       var pageScrollKey = "chatPageScrollY";
       var logScrollKey = "chatLogScrollY";
@@ -180,12 +183,10 @@
         history.scrollRestoration = "manual";
       }
 
-      // Remember scroll positions right before any chat form submits
       document.querySelectorAll(".chat-form").forEach(function(form) {
         form.addEventListener("submit", function() {
           sessionStorage.setItem(pageScrollKey, String(window.scrollY));
 
-          // If this is the send action, scroll to the newest message on reload
           var actionInput = form.querySelector('input[name="action"]');
           if (actionInput && actionInput.value === "send") {
             sessionStorage.setItem(scrollToBottomKey, "1");
@@ -198,7 +199,6 @@
         });
       });
 
-      // Restore positions on load so the view stays where the user was
       window.addEventListener("DOMContentLoaded", function() {
         var savedPageY = sessionStorage.getItem(pageScrollKey);
         var log = document.querySelector(".chat-log");
@@ -215,7 +215,6 @@
           var savedLogY = sessionStorage.getItem(logScrollKey);
           var shouldScrollToBottom = sessionStorage.getItem(scrollToBottomKey) === "1";
 
-          // Prioritize moving to the bottom after sending a chat message
           if (shouldScrollToBottom) {
             log.scrollTop = log.scrollHeight;
           } else if (savedLogY !== null) {
@@ -231,22 +230,25 @@
     })();
   </script>
 
-
-  <!-- ★YOUR_API_KEY をあなたのキーに置き換える -->
   <script src="{% static 'js/map.js' %}" defer></script>
-
   <script
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGXd3I891Z_bk821cyKVx4o70AIan45L0&callback=initMap"
     defer
   ></script>
+
+  <!-- ★ 送信処理 + choicesボタン生成 -->
   <script>
 (function(){
   const form = document.getElementById("chat-send-form");
   if(!form) return;
 
   const overlay = document.getElementById("loading-overlay");
+  const inputSection = document.getElementById("chat-input");
   const input = form.querySelector('input[name="message"]');
   const csrf = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+  const choicesBox = document.getElementById("chat-choices");
+  const choicesInner = document.getElementById("chat-choices-inner");
 
   const progressBar = document.getElementById("ragProgressBar");
   const progressText = document.getElementById("ragProgressText");
@@ -272,10 +274,8 @@
     const li = document.createElement("li");
     li.className = `chat-message chat-message--${role}`;
 
-    // Django側のログイン名をJSへ渡す（未ログインは「あなた」）
     const USER_NAME = "{{ user.username|default:'あなた' }}";
     const BOT_NAME = "いじゅナビ";
-
     const label = (role === "bot") ? BOT_NAME : USER_NAME;
 
     li.innerHTML = `<span class="chat-message__role">${label}：</span>
@@ -285,6 +285,11 @@
 
     const logBox = document.querySelector(".chat-log");
     if(logBox) logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  function setProgress(percent, message){
+    if(progressBar) progressBar.value = Math.max(0, Math.min(100, percent || 0));
+    if(progressText) progressText.textContent = message || "";
   }
 
   async function postJson(url){
@@ -306,11 +311,6 @@
       },
     });
     return await res.json();
-  }
-
-  function setProgress(percent, message){
-    if(progressBar) progressBar.value = Math.max(0, Math.min(100, percent || 0));
-    if(progressText) progressText.textContent = message || "";
   }
 
   async function runRagWithProgress(initUrl, progressUrl, recommendUrl){
@@ -347,6 +347,85 @@
     }
   }
 
+  async function sendMessage(text){
+    const fd = new FormData();
+    fd.append("action", "send");
+    fd.append("message", text);
+
+    const res = await fetch(window.location.href, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": csrf,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: fd
+    });
+
+    return await res.json();
+  }
+
+  function clearChoices(){
+    if(!choicesInner) return;
+    choicesInner.innerHTML = "";
+  }
+
+  function renderChoices(choices){
+    const has = Array.isArray(choices) && choices.length > 0;
+
+    if(has){
+      clearChoices();
+      choicesBox.style.display = "block";
+      inputSection.style.display = "none";
+
+      choices.forEach((c) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "button login-button";
+        btn.textContent = c;
+        btn.addEventListener("click", async () => {
+          appendMessage("user", c);
+          overlay.style.display = "flex";
+          try{
+            const data = await sendMessage(c);
+            if(!data.ok){
+              appendMessage("bot", "エラーが発生しました。");
+              return;
+            }
+            (data.bot_messages || []).forEach(m => appendMessage("bot", m));
+
+            renderChoices(data.choices || []);
+
+            if(data.need_rag_progress){
+              await runRagWithProgress(data.init_url, data.progress_url, data.recommend_url);
+              return;
+            }
+
+            if(data.redirect_url){
+              window.location.href = data.redirect_url;
+              return;
+            }
+
+          }catch(err){
+            appendMessage("bot", "通信エラーが発生しました。");
+          }finally{
+            overlay.style.display = "none";
+          }
+        });
+        choicesInner.appendChild(btn);
+      });
+
+    }else{
+      choicesBox.style.display = "none";
+      inputSection.style.display = "block";
+      clearChoices();
+    }
+  }
+
+  // 初期表示（サーバー側で current_choices を渡している想定）
+  const initialChoices = {{ current_choices|default:"[]"|safe }};
+  renderChoices(initialChoices);
+
+  // テキスト送信（自由入力用）
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -359,20 +438,7 @@
     overlay.style.display = "flex";
 
     try{
-      const fd = new FormData();
-      fd.append("action", "send");
-      fd.append("message", text);
-
-      const res = await fetch(window.location.href, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: fd
-      });
-
-      const data = await res.json();
+      const data = await sendMessage(text);
 
       if(!data.ok){
         appendMessage("bot", "エラーが発生しました。");
@@ -380,6 +446,8 @@
       }
 
       (data.bot_messages || []).forEach(m => appendMessage("bot", m));
+
+      renderChoices(data.choices || []);
 
       if(data.need_rag_progress){
         await runRagWithProgress(data.init_url, data.progress_url, data.recommend_url);
@@ -399,7 +467,6 @@
   });
 })();
 </script>
-
 
 </body>
 </html>

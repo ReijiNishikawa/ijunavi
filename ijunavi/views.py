@@ -4,6 +4,7 @@ from django.http import HttpResponse
 from django.http import Http404
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
+
 from django.contrib import messages
 import re
 import threading
@@ -32,7 +33,7 @@ QUESTIONS = [
      "choices": ["暖かい", "涼しい", "こだわらない"]},
 
     {"key": "hospital", "ask": "通院頻度は？",
-     "choices": ["1か月に一回以上","通院していない"]},
+     "choices": ["1か月に一回以上", "通院していない"]},
 
     {"key": "family", "ask": "家族構成は？",
      "choices": ["単身", "夫婦のみ", "子供がいる"]},
@@ -46,10 +47,6 @@ QUESTIONS = [
 
 
 def get_next_question(step, answers):
-    """
-    step(質問index) から先で、条件を満たす「次に出すべき質問」を返す。
-    条件を満たさない質問はスキップ。
-    """
     while step < len(QUESTIONS):
         q = QUESTIONS[step]
 
@@ -85,10 +82,6 @@ def _get_question_by_step(step: int):
 
 
 def _validate_choice(q: dict, user_msg: str):
-    """
-    choices がある質問の入力を検証。
-    OKなら (True, user_msg) / NGなら (False, エラーメッセージ)
-    """
     choices = q.get("choices")
     if not choices:
         return True, user_msg
@@ -101,9 +94,6 @@ def _validate_choice(q: dict, user_msg: str):
 
 
 def _get_rag_recommendation(answers):
-    """
-    RAGサービスを呼び出し、ユーザーの回答に基づいて移住先を提案する。
-    """
     age = answers.get("age")
     style = answers.get("style", "")
     climate = answers.get("climate", "")
@@ -111,10 +101,11 @@ def _get_rag_recommendation(answers):
     hospital = answers.get("hospital", "")
     child_grade = answers.get("child_grade", "")
     a_else = answers.get("else", "")
-    # 子供がいる時だけ学年を含める
+
     child_line = ""
     if family == "子供がいる" and child_grade:
         child_line = f"子供の学年は「{child_grade}」です。"
+
     prompt = f"""
 私の年齢は{age}歳です。
 家族構成は{family}です。
@@ -123,7 +114,22 @@ def _get_rag_recommendation(answers):
 子供の学年は「{child_grade}」なので学校が必要だと判断した場合学校が多い地区を選定してください。
 通院頻度は「{hospital}」なので必要な場合病院がある地区を選定してください。
 また{a_else}も考慮してください。
+
 これらの条件に最も合う地方移住先を提案し、その地域に関する情報を詳細に教えてください。
+
+必ずこの形式で出力してください。
+■結論：(地域名と要約)
+■理由1（参照：[ファイル名]）
+(具体的理由)
+■理由2（参照：[ファイル名]）
+(具体的理由)
+■理由3（参照：[ファイル名]）
+(具体的理由)
+■補足・アドバイス
+(注意点など)
+--- 参照情報 ---
+(参照情報)
+
 回答をそのまま出力するため、特殊文字は使用しないで下さい。
 内容の種類ごとに改行をするようにしてください。
 """.strip()
@@ -150,7 +156,7 @@ def _get_rag_recommendation(answers):
 def chat_view(request):
     chat_active = request.session.get("chat_active", False)
     messages_sess = request.session.get("messages", [])
-    step = request.session.get("step", -1)  # -1:未開始, 0..質問index, 100:結果表示
+    step = request.session.get("step", -1)  # -1:未開始, 0..質問index, 99:作成中, 100:結果表示
     answers = request.session.get("answers", {})
     result = request.session.get("result")
 
@@ -166,6 +172,10 @@ def chat_view(request):
 
     def add_user(msg_list, text):
         msg_list.append({"role": "user", "sender": display_name, "text": text})
+
+    def get_choices_for_step(step_value):
+        q = _get_question_by_step(step_value)
+        return (q.get("choices", []) if q else []) or []
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -216,7 +226,6 @@ def chat_view(request):
 
             qkey = q["key"]
 
-            # age は数字強制
             if qkey == "age":
                 age_val = _int_from_text(user_msg)
                 if age_val is None:
@@ -224,11 +233,10 @@ def chat_view(request):
                     add_bot(messages_sess, msg)
                     request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
                     if is_ajax:
-                        return JsonResponse({"ok": True, "bot_messages": [msg]})
+                        return JsonResponse({"ok": True, "bot_messages": [msg], "choices": get_choices_for_step(step)})
                     return redirect("chat")
                 answers[qkey] = age_val
 
-            # choices 質問
             elif "choices" in q:
                 ok, val_or_msg = _validate_choice(q, user_msg)
                 if not ok:
@@ -236,15 +244,13 @@ def chat_view(request):
                     add_bot(messages_sess, msg)
                     request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
                     if is_ajax:
-                        return JsonResponse({"ok": True, "bot_messages": [msg]})
+                        return JsonResponse({"ok": True, "bot_messages": [msg], "choices": get_choices_for_step(step)})
                     return redirect("chat")
                 answers[qkey] = val_or_msg
 
-            # 自由入力
             else:
                 answers[qkey] = user_msg
 
-            # 次の質問へ（condition を考慮してスキップ）
             next_step, next_q = get_next_question(step + 1, answers)
 
             if next_q:
@@ -254,10 +260,13 @@ def chat_view(request):
 
                 request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
                 if is_ajax:
-                    return JsonResponse({"ok": True, "bot_messages": bot_messages})
+                    return JsonResponse({
+                        "ok": True,
+                        "bot_messages": bot_messages,
+                        "choices": next_q.get("choices", []) or [],
+                    })
                 return redirect("chat")
 
-            # 質問終了 → RAGへ
             done_msg = "おすすめを作成中です…（しばらくお待ちください）"
             add_bot(messages_sess, done_msg)
             bot_messages.append(done_msg)
@@ -270,6 +279,7 @@ def chat_view(request):
                 return JsonResponse({
                     "ok": True,
                     "bot_messages": bot_messages,
+                    "choices": [],
                     "need_rag_progress": True,
                     "init_url": reverse("rag_init"),
                     "progress_url": reverse("rag_progress"),
@@ -284,30 +294,30 @@ def chat_view(request):
                     del request.session[k]
             return redirect("chat")
 
+    current_choices = []
+    if chat_active and 0 <= step < len(QUESTIONS):
+        current_choices = get_choices_for_step(step)
+
     return render(request, "ijunavi/chat.html", {
         "chat_active": chat_active,
         "messages": messages_sess,
         "step": step,
         "answers": answers,
         "result": result,
+        "current_choices": current_choices,
     })
 
 
-# --- mainブランチ側の基本ビュー関数を統合 ---
-
 def top(request):
-    """トップページ"""
     return render(request, 'ijunavi/top.html')
 
 
 def chat_history(request):
-    """チャット履歴表示"""
     messages_sess = request.session.get("messages", [])
     return render(request, 'ijunavi/history.html', {"messages": messages_sess})
 
 
 def _get_bookmarks(request):
-    """セッションからブックマーク一覧取得（例データ）"""
     bms = request.session.get("bookmarks")
     if bms is None:
         bms = []
@@ -317,7 +327,6 @@ def _get_bookmarks(request):
 
 @login_required
 def mypage_view(request):
-    """ログイン中ユーザーのプロフィール表示"""
     return render(request, 'ijunavi/mypage.html', {
         "user": request.user,
     })
@@ -325,7 +334,6 @@ def mypage_view(request):
 
 @login_required
 def profile_edit_view(request):
-    """プロフィール編集"""
     if request.method == "POST":
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
@@ -342,7 +350,6 @@ def profile_edit_view(request):
 
 @login_required
 def bookmark_view(request):
-    """ブックマーク一覧"""
     bookmarks = _get_bookmarks(request)
     return render(request, 'ijunavi/bookmark.html', {
         "bookmarks": bookmarks,
@@ -351,7 +358,6 @@ def bookmark_view(request):
 
 @login_required
 def bookmark_remove(request):
-    """ブックマーク解除（POST: index）"""
     if request.method == "POST":
         idx = request.POST.get("index")
         bookmarks = _get_bookmarks(request)
@@ -367,7 +373,6 @@ def bookmark_remove(request):
 
 @login_required
 def bookmark_add(request):
-    """ブックマーク追加（POST）"""
     if request.method != "POST":
         return redirect("bookmark")
 
@@ -413,6 +418,16 @@ def _parse_rag_blocks(text: str) -> dict:
         "advice": pick(r"■補足・アドバイス\s*\n(.*?)(?=\n\s*---\s*参照情報\s*---|\Z)"),
         "refs": pick(r"---\s*参照情報\s*---\s*\n(.*?)(?=\Z)"),
     }
+
+    # ★理由3が必ず出るようにする（空なら埋める）
+    if not parsed["reason3"]:
+        if parsed["reason2"]:
+            parsed["reason3"] = parsed["reason2"]
+        elif parsed["reason1"]:
+            parsed["reason3"] = parsed["reason1"]
+        else:
+            parsed["reason3"] = "理由3の情報が取得できませんでした。別の条件でもう一度お試しください。"
+
     return parsed
 
 

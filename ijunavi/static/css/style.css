@@ -438,3 +438,16 @@ input[type="email"],input[type="password"] {
 .result-body {
   font-size: 14px;
 }
+
+.chat-choices {
+  padding: 12px 0;
+}
+
+.chat-choices__inner {
+  display: grid;
+  gap: 10px;
+}
+
+.chat-choices__inner .button {
+  width: 100%;
+}
