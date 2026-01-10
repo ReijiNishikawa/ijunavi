@@ -40,16 +40,7 @@
           {% if step == 100 and result %}
             <!-- 質問完了：おすすめ表示 -->
             <div class="chat-result">
-              <h2>{{ result.headline }}</h2>
-
-              <!-- ブックマークフォーム -->
-              <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
-                {% csrf_token %}
-                <input type="hidden" name="title" value="{{ result.headline }}">
-                <input type="hidden" name="address" value="{{ result.map_address }}">
-                <input type="hidden" name="spots" value="{{ result.spots|join:'|||'}}">
-                <button type="submit" class="button signup-button">この提案をブックマーク</button>
-              </form>
+              <h2>{{ result.headline }}</h2>              
 
               <!-- ★Googleマップを表示するエリア -->
               <div class="chat-map">
@@ -59,15 +50,48 @@
               </div>
 
               <!-- RAGからのスポット一覧表示 -->
-              <div class="chat-spots">
-                {% for line in result.spots %}
-                  <div>{{ line }}</div>
-                {% endfor %}
+              <div class="chat-result-box">
+              <div class="result-section">
+                <div class="result-title">理由1</div>
+                <div class="result-body chat-pre">{{ result.parsed.reason1 }}</div>
               </div>
 
+              <div class="result-section">
+                <div class="result-title">理由2</div>
+                <div class="result-body chat-pre">{{ result.parsed.reason2 }}</div>
+              </div>
+
+              {% if result.parsed.reason3 %}
+              <div class="result-section">
+                <div class="result-title">理由3</div>
+                <div class="result-body chat-pre">{{ result.parsed.reason3 }}</div>
+              </div>
+              {% endif %}
+
+              <div class="result-section">
+                <div class="result-title">補足・アドバイス</div>
+                <div class="result-body chat-pre">{{ result.parsed.advice }}</div>
+              </div>
+
+              {% if result.parsed.refs %}
+              <div class="result-section">
+                <div class="result-title">参照情報</div>
+                <div class="result-body chat-pre">{{ result.parsed.refs }}</div>
+              </div>
+              {% endif %}
+            </div>
               <p class="chat-link">
                 <a href="{% url 'history' %}">履歴をみる</a>
               </p>
+
+            <!-- ブックマークフォーム -->
+              <form method="post" action="{% url 'bookmark_add' %}" class="chat-form" style="margin-bottom: 1rem;">
+                {% csrf_token %}
+                <input type="hidden" name="title" value="{{ result.headline }}">
+                <input type="hidden" name="address" value="{{ result.map_address }}">
+                <input type="hidden" name="spots" value="{{ result.spots|join:'|||'}}">
+                <button type="submit" class="button signup-button">この提案をブックマーク</button>
+              </form>
 
               <form method="post" class="chat-form">
                 {% csrf_token %}
@@ -83,10 +107,8 @@
                 <ul>
                   {% for m in messages %}
                     <li class="chat-message chat-message--{{ m.role }}">
-                      <span class="chat-message__role">
-                        {{ m.sender|default:m.role }}：
-                      </span>
-                      <span class="chat-message__text">{{ m.text }}</span>
+                      <span class="chat-message__role">{{ m.role }}：</span>
+                      <span class="chat-message__text chat-pre">{{ m.text }}</span>
                     </li>
                   {% endfor %}
                 </ul>
@@ -206,51 +228,13 @@
       });
     })();
   </script>
-    <script>
-    function initMap() {
-      const mapElement = document.getElementById("result-map");
-      if (!mapElement) return;
 
-      // Django から埋め込んだ住所（例：沖縄県南城市）
-      const address = mapElement.dataset.address;
-
-      // 初期表示は日本全体寄り
-      const defaultCenter = { lat: 35.681236, lng: 139.767125 };
-
-      const map = new google.maps.Map(mapElement, {
-        center: defaultCenter,
-        zoom: 5,
-      });
-
-      if (!address) {
-        console.warn("住所が指定されていません");
-        return;
-      }
-
-      const geocoder = new google.maps.Geocoder();
-
-      geocoder.geocode({ address: address }, function(results, status) {
-        if (status === "OK" && results[0]) {
-          const loc = results[0].geometry.location;
-          map.setCenter(loc);
-          map.setZoom(11);
-
-          new google.maps.Marker({
-            map: map,
-            position: loc,
-            title: address,
-          });
-        } else {
-          console.error("Geocode failed: " + status);
-        }
-      });
-    }
-  </script>
 
   <!-- ★YOUR_API_KEY をあなたのキーに置き換える -->
+  <script src="{% static 'js/map.js' %}" defer></script>
+
   <script
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDGXd3I891Z_bk821cyKVx4o70AIan45L0&callback=initMap"
-    async
     defer
   ></script>
   <script>

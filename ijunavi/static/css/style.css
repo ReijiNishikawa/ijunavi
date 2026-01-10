@@ -416,3 +416,25 @@ input[type="email"],input[type="password"] {
 
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.chat-result-box {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.result-section {
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+}
+
+.result-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.result-body {
+  font-size: 14px;
+}
