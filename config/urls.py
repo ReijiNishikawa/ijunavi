@@ -32,7 +32,7 @@ urlpatterns = [
     path('bookmark/remove/', ijunavi_views.bookmark_remove, name='bookmark_remove'),
     path("bookmark/detail/<int:index>/", ijunavi_views.bookmark_detail, name="bookmark_detail"),
     path('accounts/', include('accounts.urls')),
-    path('logout/', auth_views.LogoutView.as_view(next_page='top'), name='logout'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='chat'), name='logout'),
 
     # ✅ 追加：RAG進捗API
     path('rag/init/', ijunavi_views.rag_init, name='rag_init'),
