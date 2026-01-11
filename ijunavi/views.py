@@ -334,8 +334,7 @@ def chat_view(request):
             return redirect("chat")
 
         elif action == "send" and chat_active and 0 <= step < len(QUESTIONS):
-            is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-            bot_messages = []
+            user_msg = _normalize(request.POST.get("choice") or request.POST.get("message"))
 
             user_msg = _normalize(request.POST.get("message"))
             if not user_msg:
@@ -416,8 +415,7 @@ def chat_view(request):
 
         elif action == "reset":
             for k in ("chat_active", "messages", "step", "answers", "result"):
-                if k in request.session:
-                    del request.session[k]
+                request.session.pop(k, None)
             return redirect("chat")
 
     current_choices = []

@@ -1,15 +1,21 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チャット</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>チャット</title>
+
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap"
+    rel="stylesheet"
+  >
 </head>
+
 <body class="app-page chat-page">
   <div id="app" class="app-shell">
 
@@ -21,21 +27,27 @@
 
     <main class="app-main">
       <section class="app-card chat-card" aria-label="チャット">
-        {% if not chat_active %}
 
+        {% if not chat_active %}
           <div class="chat-intro">
             <h2>チャットでおすすめの街を探す</h2>
             <p>いくつかの質問に答えるだけで、あなたに合った街をご提案します。</p>
           </div>
-          
+
           <form method="post" class="chat-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="start">
-            <button type="submit" class="button login-button">チャットボットを開始</button>
+            <button type="submit" class="button login-button">
+              チャットボットを開始
+            </button>
           </form>
-          <p class="chat-link"><a href="{% url 'history' %}">履歴をみる</a></p>
+
+          <p class="chat-link">
+            <a href="{% url 'history' %}">履歴をみる</a>
+          </p>
 
         {% else %}
+
           {% if step == 100 and result %}
             <div class="chat-result">
               <h2>■結論：{{ result.map_address }}</h2>
@@ -80,7 +92,9 @@
               <form method="post" class="chat-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="reset">
-                <button type="submit" class="button signup-button">最初からやり直す</button>
+                <button type="submit" class="button signup-button">
+                  最初からやり直す
+                </button>
               </form>
             </div>
 
@@ -113,13 +127,17 @@
               </form>
             </section>
 
-            <section class="chat-reset">
-              <form method="post" class="chat-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="reset">
-                <button type="submit" class="button signup-button">終了してリセット</button>
-              </form>
-            </section>
+              <section class="chat-reset">
+                <form method="post" class="chat-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="reset">
+                  <button type="submit" class="button signup-button">
+                    終了してリセット
+                  </button>
+                </form>
+              </section>
+
+            {% endif %}
           {% endif %}
         {% endif %}
       </section>
@@ -130,30 +148,26 @@
           <p id="loading-title">おすすめを作成中…</p>
           <small id="loading-sub">データを検索して回答を生成しています</small>
 
-          <div style="width:100%; margin-top:12px;">
-            <div id="ragProgressText" style="font-size:13px; margin-bottom:6px;">準備中...</div>
-            <progress id="ragProgressBar" value="0" max="100" style="width:100%; height:18px;"></progress>
-          </div>
-        </div>
-      </div>
+      </section>
     </main>
 
     <footer class="app-footer">
       <nav aria-label="ボトムタブ">
         <ul class="bottom-nav">
-          <li><a href="{% url 'chat' %}" aria-current="page">chat</a></li>
+          <li>
+            <a href="{% url 'chat' %}" aria-current="page">chat</a>
+          </li>
 
           {% if user.is_authenticated %}
-          <li><a href="/mypage/">my page</a></li>
-          <li><a href="/bookmark/">bookmark</a></li>
+            <li><a href="/mypage/">my page</a></li>
+            <li><a href="/bookmark/">bookmark</a></li>
           {% else %}
-          <li><a href="{% url 'signup' %}">sign up</a></li>
-          <li><a href="{% url 'login' %}">login</a></li>
+            <li><a href="{% url 'signup' %}">sign up</a></li>
+            <li><a href="{% url 'login' %}">login</a></li>
           {% endif %}
-
         </ul>
       </nav>
-  </footer>
+    </footer>
 
   </div>
 

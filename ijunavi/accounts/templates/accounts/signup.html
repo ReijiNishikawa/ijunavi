@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新規登録</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="{% static 'img/image.png' %}" alt="いじゅナビロゴ">
+        </div>
+        <h1>新規登録</h1>
+        <form action="{% url 'signup' %}" method="post" class="form-div">
+          {% csrf_token %}
+            <div class="form-group">
+                {{ signin_form.email.label_tag }}
+                <br>
+                {{ signin_form.email }}
+                {{ signin_form.email.errors }}
+            </div>
+            <div class="form-group">
+                {{ signin_form.password.label_tag }}
+                <br>
+                {{ signin_form.password }}
+                {{ signin_form.password.errors }}
+            </div>
+            <div class="form-group">
+                {{ signin_form.confirm_password.label_tag }}
+                <br>
+                {{ signin_form.confirm_password }}
+                {{ signin_form.confirm_password.errors }}
+            </div>
+            <button type="submit" class="button signup-button">新規登録</button>
+        </form>
+    </div>
+</body>
+</html>
