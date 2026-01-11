@@ -1,22 +1,30 @@
+// static/js/chat.js
 (function () {
   const form = document.getElementById("chat-send-form");
   if (!form) return;
 
-  const overlay = document.getElementById("loading-overlay");
-  const input = form.querySelector('input[name="message"]');
-  const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
-
-  const csrf = csrfInput ? csrfInput.value : "";
-
-  const progressBar = document.getElementById("ragProgressBar");
-  const progressText = document.getElementById("ragProgressText");
-  const loadingTitle = document.getElementById("loading-title");
-  const loadingSub = document.getElementById("loading-sub");
-
   const postUrl = form.dataset.postUrl || window.location.href;
+
+  const USER_NAME = form.dataset.userName || "あなた";
+  const BOT_NAME = form.dataset.botName || "いじゅナビ";
+
   const initUrlDefault = form.dataset.initUrl || "";
   const progressUrlDefault = form.dataset.progressUrl || "";
   const recommendUrlDefault = form.dataset.recommendUrl || "";
+
+  const overlay = document.getElementById("loading-overlay");
+
+  const inputSection = document.getElementById("chat-input");
+  const input = form.querySelector('input[name="message"]');
+
+  const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+  const csrf = csrfInput ? csrfInput.value : "";
+
+  const choicesBox = document.getElementById("chat-choices");
+  const choicesInner = document.getElementById("chat-choices-inner");
+
+  const progressBar = document.getElementById("ragProgressBar");
+  const progressText = document.getElementById("ragProgressText");
 
   function ensureLogUl() {
     const logBox = document.querySelector(".chat-log");
@@ -36,13 +44,29 @@
 
     const li = document.createElement("li");
     li.className = `chat-message chat-message--${role}`;
-    li.innerHTML = `<span class="chat-message__role">${role}：</span>
-                    <span class="chat-message__text"></span>`;
+
+    const label = role === "bot" ? BOT_NAME : USER_NAME;
+
+    li.innerHTML = `<span class="chat-message__role"></span>
+                    <span class="chat-message__text chat-pre"></span>`;
+    li.querySelector(".chat-message__role").textContent = `${label}：`;
     li.querySelector(".chat-message__text").textContent = text;
+
     ul.appendChild(li);
 
     const logBox = document.querySelector(".chat-log");
     if (logBox) logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  function setOverlay(show) {
+    if (!overlay) return;
+    overlay.style.display = show ? "flex" : "none";
+  }
+
+  function setProgress(percent, message) {
+    const pct = Math.max(0, Math.min(100, typeof percent === "number" ? percent : 0));
+    if (progressBar) progressBar.value = pct;
+    if (progressText) progressText.textContent = message || "";
   }
 
   async function postJson(url, bodyFormData) {
@@ -67,44 +91,139 @@
     return await res.json();
   }
 
-  function setProgress(percent, message) {
-    const pct = Math.max(0, Math.min(100, percent || 0));
-    if (progressBar) progressBar.value = pct;
-    if (progressText) progressText.textContent = message || "";
+  async function sendMessage(text) {
+    const fd = new FormData();
+    fd.append("action", "send");
+    fd.append("message", text);
+
+    const res = await fetch(postUrl, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": csrf,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: fd,
+    });
+
+    return await res.json();
+  }
+
+  function clearChoices() {
+    if (!choicesInner) return;
+    choicesInner.innerHTML = "";
+  }
+
+  function renderChoices(choices) {
+    const has = Array.isArray(choices) && choices.length > 0;
+
+    if (has) {
+      clearChoices();
+      if (choicesBox) choicesBox.style.display = "block";
+      if (inputSection) inputSection.style.display = "none";
+
+      choices.forEach((c) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "button login-button";
+        btn.textContent = c;
+
+        btn.addEventListener("click", async () => {
+          appendMessage("user", c);
+
+          try {
+            const data = await sendMessage(c);
+
+            if (!data.ok) {
+              appendMessage("bot", "エラーが発生しました。");
+              return;
+            }
+
+            (data.bot_messages || []).forEach((m) => appendMessage("bot", m));
+            renderChoices(data.choices || []);
+
+            if (data.need_rag_progress) {
+              const initUrl = data.init_url || initUrlDefault;
+              const progressUrl = data.progress_url || progressUrlDefault;
+              const recommendUrl = data.recommend_url || recommendUrlDefault;
+
+              if (!initUrl || !progressUrl || !recommendUrl) {
+                appendMessage("bot", "進捗用URLが設定されていません。");
+                return;
+              }
+
+              await runRagWithProgress(initUrl, progressUrl, recommendUrl);
+              return;
+            }
+
+            if (data.redirect_url) {
+              window.location.href = data.redirect_url;
+              return;
+            }
+          } catch (err) {
+            appendMessage("bot", "通信エラーが発生しました。");
+          }
+        });
+
+        if (choicesInner) choicesInner.appendChild(btn);
+      });
+    } else {
+      if (choicesBox) choicesBox.style.display = "none";
+      if (inputSection) inputSection.style.display = "block";
+      clearChoices();
+    }
   }
 
   async function runRagWithProgress(initUrl, progressUrl, recommendUrl) {
-    if (loadingTitle) loadingTitle.textContent = "おすすめを作成中…";
-    if (loadingSub) loadingSub.textContent = "データを検索して回答を生成しています";
+    setOverlay(true);
     setProgress(0, "準備中...");
 
-    await postJson(initUrl);
+    try {
+      const initRes = await postJson(initUrl);
+      if (initRes && initRes.state === "error") {
+        appendMessage("bot", "エラーが発生しました: " + (initRes.error || ""));
+        setOverlay(false);
+        return;
+      }
 
-    while (true) {
-      const st = await getJson(progressUrl);
+      while (true) {
+        const st = await getJson(progressUrl);
 
-      const pct = typeof st.percent === "number" ? st.percent : 0;
-      const msg = st.message || "";
-      setProgress(pct, msg);
+        const pct = typeof st.percent === "number" ? st.percent : 0;
+        const msg = st.message || "";
+        setProgress(pct, msg);
 
-      if (st.state === "ready") {
-        const r = await postJson(recommendUrl);
-        if (r.redirect_url) {
-          window.location.href = r.redirect_url;
+        if (st.state === "ready") {
+          const r = await postJson(recommendUrl);
+          if (r.redirect_url) {
+            window.location.href = r.redirect_url;
+            return;
+          }
+          appendMessage("bot", "結果取得に失敗しました。");
+          setOverlay(false);
           return;
         }
-        appendMessage("bot", "結果取得に失敗しました。");
-        return;
-      }
 
-      if (st.state === "error") {
-        appendMessage("bot", "エラーが発生しました: " + (st.error || ""));
-        return;
-      }
+        if (st.state === "error") {
+          appendMessage("bot", "エラーが発生しました: " + (st.error || ""));
+          setOverlay(false);
+          return;
+        }
 
-      await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    } catch (e) {
+      appendMessage("bot", "通信エラーが発生しました。");
+      setOverlay(false);
     }
   }
+
+  let initialChoices = [];
+  try {
+    initialChoices = JSON.parse(form.dataset.initialChoices || "[]");
+  } catch (e) {
+    initialChoices = [];
+  }
+  renderChoices(initialChoices);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -115,23 +234,8 @@
     appendMessage("user", text);
     input.value = "";
 
-    if (overlay) overlay.style.display = "flex";
-
     try {
-      const fd = new FormData();
-      fd.append("action", "send");
-      fd.append("message", text);
-
-      const res = await fetch(postUrl, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: fd,
-      });
-
-      const data = await res.json();
+      const data = await sendMessage(text);
 
       if (!data.ok) {
         appendMessage("bot", "エラーが発生しました。");
@@ -139,6 +243,7 @@
       }
 
       (data.bot_messages || []).forEach((m) => appendMessage("bot", m));
+      renderChoices(data.choices || []);
 
       if (data.need_rag_progress) {
         const initUrl = data.init_url || initUrlDefault;
@@ -160,8 +265,6 @@
       }
     } catch (err) {
       appendMessage("bot", "通信エラーが発生しました。");
-    } finally {
-      if (overlay) overlay.style.display = "none";
     }
   });
 })();

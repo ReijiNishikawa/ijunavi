@@ -1,15 +1,15 @@
+// static/js/map.js
 (function () {
   function normalizeAddress(raw) {
     if (!raw) return "";
 
     let s = String(raw).trim();
 
-    // ありがちな混入を除去
     s = s.replace(/^■\s*結論\s*[:：]\s*/g, "");
     s = s.replace(/[「」]/g, "");
-    s = s.replace(/[（(].*?[）)]/g, ""); // 括弧内を削除（要約等が入っても落ちないように）
-    s = s.replace(/の.+$/g, "");         // 「○○市の○○」→「○○市」
-    s = s.split(/[、,：:\n]/)[0].trim(); // 余計な説明を切る
+    s = s.replace(/[（(].*?[）)]/g, "");
+    s = s.replace(/の.+$/g, "");
+    s = s.split(/[、,：:\n]/)[0].trim();
 
     return s.trim();
   }
