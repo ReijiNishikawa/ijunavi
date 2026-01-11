@@ -35,11 +35,10 @@ class Users(AbstractBaseUser, PermissionsMixin):
     token_created_at = models.DateTimeField(null=True, blank=True)
     is_verified = models.BooleanField(default=False)
 
-    # ここを UserManager → UsersManager に変更！
     objects = UsersManager()
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = []  # username不要
+    REQUIRED_FIELDS = []
 
     class Meta:
         db_table = "users"

@@ -10,57 +10,43 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 </head>
-<body>
-    <main>
-    <div class="container">
-        <div class="logo">
-            <img src="{% static 'img/image.png' %}" alt="いじゅナビロゴ">
-        </div>
-        <h1>新規登録</h1>
-        <form action="{% url 'signup' %}" method="post" class="form-div">
-          {% csrf_token %}
-            <div class="form-group">
-                {{ signin_form.email.label_tag }}
-                <br>
-                {{ signin_form.email }}
-                {{ signin_form.email.errors }}
-            </div>
-            <div class="form-group">
-                {{ signin_form.password.label_tag }}
-                <br>
-                {{ signin_form.password }}
-                {{ signin_form.password.errors }}
-            </div>
-            <div class="form-group">
-                {{ signin_form.confirm_password.label_tag }}
-                <br>
-                {{ signin_form.confirm_password }}
-                {{ signin_form.confirm_password.errors }}
-            </div>
-            
-            <div>
-                {{ signin_form.password1.label_tag }}
-                {{ signin_form.password1 }}
-
-                {% if signin_form.password1.errors %}
-                    <div style="color:red;">
-                        {% for error in signin_form.password1.errors %}
-                            {{ error }}
-                        {% endfor %}
+<body class="app-page auth-page">
+    <div class="auth-shell">
+        <main class="auth-main">
+            <div class="auth-card">
+                <a class="logo" href="{% url 'chat' %}">
+                    <img src="{% static 'img/image.png' %}" alt="いじゅナビロゴ">
+                </a>
+                <h1>新規登録</h1>
+                <form action="{% url 'signup' %}" method="post" class="form-div">
+                  {% csrf_token %}
+                    <div class="form-group">
+                        {{ signin_form.email.label_tag }}
+                        {{ signin_form.email }}
+                        {{ signin_form.email.errors }}
                     </div>
-                {% endif %}
-            </div>
+                    <div class="form-group">
+                        {{ signin_form.password.label_tag }}
+                        {{ signin_form.password }}
+                        {{ signin_form.password.errors }}
+                    </div>
+                    <div class="form-group">
+                        {{ signin_form.confirm_password.label_tag }}
+                        {{ signin_form.confirm_password }}
+                        {{ signin_form.confirm_password.errors }}
+                    </div>
 
-            <button type="submit" class="button signup-button">新規登録</button>
-        </form>
+                    <button type="submit" class="button signup-button">新規登録</button>
+                </form>
+            </div>
+        </main>
     </div>
-    </main>
 
     <footer class="app-footer">
         <nav aria-label="ボトムタブ">
         <ul class="bottom-nav">
-            <li><a href="{% url 'chat' %}" aria-current="page">chat</a></li>
-            <li><a href="{% url 'signup' %}">sign up</a></li>
+            <li><a href="{% url 'chat' %}">chat</a></li>
+            <li><a href="{% url 'signup' %}" aria-current="page">sign up</a></li>
             <li><a href="{% url 'login' %}">login</a></li>
         </ul>
         </nav>

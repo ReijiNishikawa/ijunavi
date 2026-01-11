@@ -1,6 +1,7 @@
 import uuid
 from .models import Users
 from django.urls import reverse
+from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth import authenticate, login as auth_login
 from django.shortcuts import render, redirect, get_object_or_404
@@ -69,8 +70,8 @@ def signup_view(request):
                         f'お早めにアクセスいただき、登録手続きを完了してください。\n\n'
                         f'なお、このメールに心当たりがない場合は、\n'
                         f'お手数ですが本メールを破棄していただきますようお願いいたします。',
-                        'ijunavi@gmail.com',
-                        [user.email],
+                        settings.DEFAULT_FROM_EMAIL,
+                        [existing_user.email],
                     )
                     return render(request, 'accounts/registration_sent.html')
                 
@@ -98,13 +99,13 @@ def signup_view(request):
                     f'お早めにアクセスいただき、登録手続きを完了してください。\n\n'
                     f'なお、このメールに心当たりがない場合は、\n'
                     f'お手数ですが本メールを破棄していただきますようお願いいたします。',
-                    'ijunavi@gmail.com',
+                    settings.DEFAULT_FROM_EMAIL,
                     [user.email],
                 )
                 return render(request, 'accounts/registration_sent.html')
             
             except ValidationError as e:
-                signup_form.add_error('password1', e.messages)
+                signup_form.add_error('password', e.messages)
 
     else:
         signup_form = SignInForm()

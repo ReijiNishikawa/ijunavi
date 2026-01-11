@@ -13,9 +13,9 @@
 <body class="app-page">
     <div id="app" class="app-shell">
   <header class="app-header">
-    <div class="app-logo">
+    <a class="app-logo" href="{% url 'chat' %}">
       <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
-    </div>
+    </a>
     <h1>ブックマーク</h1>
   </header>
   
@@ -26,22 +26,26 @@
         <ul class="bookmark-list">
           {% for bm in bookmarks %}
             <li class="bookmark-item">
-              <pre>
-【地図サムネイル】{{ bm.title|default:"施設名" }}
-住所：{{ bm.address|default:"東京都○○区…" }}
-保存日時：{{ bm.saved_at|default:"（未記録）" }}
-<a href="{% url 'bookmark_detail' forloop.counter0 %}">[詳細]</a>
-              </pre>
-              <form method="post" action="{% url 'bookmark_remove' %}" class="bookmark-form">
-                {% csrf_token %}
-                <input type="hidden" name="index" value="{{ forloop.counter0 }}">
-                <button type="submit" class="button signup-button">ブックマーク解除</button>
-              </form>
+              <div class="bookmark-header">
+                <div>
+                  <div class="bookmark-title">{{ bm.title|default:"施設名" }}</div>
+                  <div class="bookmark-meta">住所：{{ bm.address|default:"東京都○○区…" }}</div>
+                  <div class="bookmark-meta">保存日時：{{ bm.saved_at|date:"Y/m/d H:i"|default:"（未記録）" }}</div>
+                </div>
+              </div>
+              <div class="bookmark-actions">
+                <a href="{% url 'bookmark_detail' forloop.counter0 %}" class="button signup-button">詳細を見る</a>
+                <form method="post" action="{% url 'bookmark_remove' %}" class="bookmark-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="index" value="{{ forloop.counter0 }}">
+                  <button type="submit" class="button login-button">ブックマーク解除</button>
+                </form>
+              </div>
             </li>
           {% endfor %}
         </ul>
       {% else %}
-        <p>ブックマークはありません。</p>
+        <p class="bookmark-empty">ブックマークはありません。</p>
       {% endif %}
     </section>
   </main>
