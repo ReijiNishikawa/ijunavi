@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プロフィール編集</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body class="app-page">
+  <div id="app" class="app-shell">
+    <header class="app-header">
+      <div class="app-logo">
+        <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
+      </div>
+      <h1>プロフィール編集</h1>
+    </header>
+
+    <main class="app-main">
+      <section class="app-card">
+        {% if messages %}
+          <ul class="message-list">
+            {% for message in messages %}
+              <li class="message-list__item">{{ message }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="profile-edit-form">
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+          <div class="form-group">
+            {{ form.username.label_tag }}
+            {{ form.username }}
+            {{ form.username.errors }}
+          </div>
+          <div class="form-group">
+            {{ form.email.label_tag }}
+            {{ form.email }}
+            {{ form.email.errors }}
+          </div>
+          <div class="form-group">
+            <label>現在のプロフィール画像</label>
+            <div class="profile-avatar profile-avatar--small">
+              {% if request.user.icon %}
+                <img src="{{ request.user.icon.url }}" alt="現在のプロフィール画像">
+              {% else %}
+                <img src="{% static 'img/image.png' %}" alt="プロフィール画像（未設定）">
+              {% endif %}
+            </div>
+          </div>
+          <div class="form-group">
+            {{ form.icon.label_tag }}
+            {{ form.icon }}
+            {{ form.icon.errors }}
+          </div>
+          <div class="profile-actions">
+            <button type="submit" class="button login-button">保存する</button>
+            <a href="{% url 'mypage' %}" class="button signup-button">キャンセル</a>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <nav aria-label="ボトムタブ">
+        <ul class="bottom-nav">
+          <li><a href="{% url 'chat' %}">chat</a></li>
+          <li><a href="{% url 'mypage' %}">my page</a></li>
+          <li><a href="{% url 'bookmark' %}">bookmark</a></li>
+        </ul>
+      </nav>
+    </footer>
+  </div>
+</body>
+</html>
