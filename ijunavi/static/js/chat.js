@@ -47,12 +47,23 @@
 
     const label = role === "bot" ? BOT_NAME : USER_NAME;
 
-    li.innerHTML = `<span class="chat-message__role"></span>
-                    <span class="chat-message__text chat-pre"></span>`;
-    li.querySelector(".chat-message__role").textContent = `${label}：`;
+    li.innerHTML = `
+      <span class="chat-message__role">${label}：</span>
+      <span class="chat-message__text chat-pre"></span>
+    `;
     li.querySelector(".chat-message__text").textContent = text;
 
     ul.appendChild(li);
+
+    requestAnimationFrame(() => {
+      li.classList.add("is-new");
+    });
+
+    li.addEventListener(
+      "animationend",
+      () => li.classList.remove("is-new"),
+      { once: true }
+    );
 
     const logBox = document.querySelector(".chat-log");
     if (logBox) logBox.scrollTop = logBox.scrollHeight;
@@ -242,8 +253,11 @@
         return;
       }
 
-      (data.bot_messages || []).forEach((m) => appendMessage("bot", m));
-      renderChoices(data.choices || []);
+      (data.bot_messages || []).forEach((m, i) => {
+        setTimeout(() => {
+          appendMessage("bot", m);
+        }, 600);
+      });
 
       if (data.need_rag_progress) {
         const initUrl = data.init_url || initUrlDefault;
