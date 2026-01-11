@@ -283,6 +283,7 @@ def _get_rag_recommendation(answers):
 
 
 def chat_view(request):
+    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
     chat_active = request.session.get("chat_active", False)
     messages_sess = request.session.get("messages", [])
     step = request.session.get("step", -1)  # -1:未開始, 0..質問index, 99:作成中, 100:結果表示
@@ -382,20 +383,25 @@ def chat_view(request):
             if next_q:
                 step = next_step
                 add_bot(messages_sess, next_q["ask"])
-                bot_messages.append(next_q["ask"])
 
-                request.session.update({"messages": messages_sess, "step": step, "answers": answers, "result": result})
+                request.session.update({
+                    "messages": messages_sess,
+                    "step": step,
+                    "answers": answers,
+                    "result": result,
+                })
+
                 if is_ajax:
                     return JsonResponse({
                         "ok": True,
-                        "bot_messages": bot_messages,
+                        "bot_messages": [next_q["ask"]],
                         "choices": next_q.get("choices", []) or [],
                     })
                 return redirect("chat")
 
+
             done_msg = "おすすめを作成中です…（しばらくお待ちください）"
             add_bot(messages_sess, done_msg)
-            bot_messages.append(done_msg)
 
             result = None
             step = 99
@@ -404,7 +410,7 @@ def chat_view(request):
             if is_ajax:
                 return JsonResponse({
                     "ok": True,
-                    "bot_messages": bot_messages,
+                    "bot_messages": [done_msg],
                     "choices": [],
                     "need_rag_progress": True,
                     "init_url": reverse("rag_init"),
