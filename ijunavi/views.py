@@ -337,7 +337,6 @@ def chat_view(request):
         elif action == "send" and chat_active and 0 <= step < len(QUESTIONS):
             user_msg = _normalize(request.POST.get("choice") or request.POST.get("message"))
 
-            user_msg = _normalize(request.POST.get("message"))
             if not user_msg:
                 if is_ajax:
                     return JsonResponse({"ok": False})
@@ -436,7 +435,6 @@ def chat_view(request):
         "result": result,
         "current_choices": current_choices,
     })
-
 
 def top(request):
     return render(request, 'ijunavi/top.html')

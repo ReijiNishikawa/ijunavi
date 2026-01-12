@@ -149,8 +149,16 @@
               return;
             }
 
-            (data.bot_messages || []).forEach((m) => appendMessage("bot", m));
-            renderChoices(data.choices || []);
+            (data.bot_messages || []).forEach((m, i) => {
+              setTimeout(() => {
+                appendMessage("bot", m);
+              }, 600);
+            })
+            
+            const delay = (data.bot_messages || []).length > 0 ? 600 : 0; 
+            setTimeout(() => {
+              renderChoices(data.choices || []);
+            }, delay);
 
             if (data.need_rag_progress) {
               const initUrl = data.init_url || initUrlDefault;
@@ -258,6 +266,11 @@
           appendMessage("bot", m);
         }, 600);
       });
+
+      const delay = (data.bot_messages || []).length > 0 ? 600 : 0; 
+      setTimeout(() => {
+        renderChoices(data.choices || []);
+      }, delay);
 
       if (data.need_rag_progress) {
         const initUrl = data.init_url || initUrlDefault;
