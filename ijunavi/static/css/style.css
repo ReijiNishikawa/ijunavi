@@ -65,9 +65,8 @@ h1, h2, h3 {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  position: static;
+  z-index: auto;
   padding: 8px 12px;
   background: transparent;
   backdrop-filter: none;
@@ -101,6 +100,10 @@ h1, h2, h3 {
     justify-content: center;
     align-items: center;
     gap: 10px;
+  }
+
+  .app-logo {
+    display: none;
   }
 
   .app-logo img {
@@ -559,6 +562,12 @@ input[type="file"] {
 
 .auth-card a {
   color: var(--accent-strong);
+}
+
+@media (max-width: 768px) {
+  .auth-card .logo {
+    display: none;
+  }
 }
 
 /* 地図 */

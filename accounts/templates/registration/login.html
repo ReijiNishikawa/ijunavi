@@ -12,47 +12,51 @@
 </head>
 
 <body class="app-page auth-page">
-    <div class="auth-shell">
-        <main class="auth-main">
-            <div class="auth-card">
-                <a class="logo" href="{% url 'chat' %}">
-                    <img src="{% static 'img/image.png' %}" alt="いじゅナビロゴ">
-                </a>
-                <h1>ログイン</h1>
+    <div class="app-shell">
+        <header class="app-header">
+            <a class="app-logo" href="{% url 'chat' %}">
+                <img src="{% static 'img/image.png' %}" alt="いじゅナビ ロゴ">
+            </a>
+        </header>
 
-                {% if error %}
-                    <p style="color: red;">{{ error }}</p>
-                {% endif %}
+        <div class="auth-shell">
+            <main class="auth-main">
+                <div class="auth-card">
+                    <h1>ログイン</h1>
 
-                <form action="{% url 'login' %}" method="POST" class="form-div">
-                {% csrf_token %}
-                <div class="form-group">
-                    {{ form.email.label_tag }}
-                    {{ form.email }}
-                    {{ form.email.errors }}
+                    {% if error %}
+                        <p style="color: red;">{{ error }}</p>
+                    {% endif %}
+
+                    <form action="{% url 'login' %}" method="POST" class="form-div">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        {{ form.email.label_tag }}
+                        {{ form.email }}
+                        {{ form.email.errors }}
+                    </div>
+                    <div class="form-group">
+                        {{ form.password.label_tag }}
+                        {{ form.password }}
+                        {{ form.password.errors }}
+                    </div>
+                    <button type="submit" class="button login-button">ログイン</button>
+                    </form>
+                    
+                    <a href="{% url 'password_reset' %}">パスワードを忘れた場合はこちら</a>
                 </div>
-                <div class="form-group">
-                    {{ form.password.label_tag }}
-                    {{ form.password }}
-                    {{ form.password.errors }}
-                </div>
-                <button type="submit" class="button login-button">ログイン</button>
-                </form>
-                
-                <a href="{% url 'password_reset' %}">パスワードを忘れた場合はこちら</a>
-            </div>
-        </main>
+            </main>
+        </div>
+
+        <footer class="app-footer">
+            <nav aria-label="ボトムタブ">
+            <ul class="bottom-nav">
+                <li><a href="{% url 'chat' %}">chat</a></li>
+                <li><a href="{% url 'signup' %}">sign up</a></li>
+                <li><a href="{% url 'login' %}" aria-current="page">login</a></li>
+            </ul>
+            </nav>
+        </footer>
     </div>
-
-    <footer class="app-footer">
-        <nav aria-label="ボトムタブ">
-        <ul class="bottom-nav">
-            <li><a href="{% url 'chat' %}">chat</a></li>
-            <li><a href="{% url 'signup' %}">sign up</a></li>
-            <li><a href="{% url 'login' %}" aria-current="page">login</a></li>
-        </ul>
-        </nav>
-    </footer>
-
 </body>
 </html>
