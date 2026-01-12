@@ -320,7 +320,7 @@ def setup_qa_chain(vectorstore):
 - 特殊文字は使用しないで下さい。
 
 【出力形式】
-■結論：(地域名のみ。例：大分県宇佐市)
+■結論：(地域名のみ。例：○○県○○市)
 ■理由1（参照：[ファイル名]）
 (その地域を推奨する具体的な理由)
 ■理由2（参照：[ファイル名]）
@@ -394,7 +394,7 @@ def initialize_rag():
 
 def _extract_conclusion_place(answer: str) -> str:
     """
-    answer から「■結論：(大分県宇佐市)」の中身だけを取り出す
+    answer から「■結論：(○○県○○市)」の中身だけを取り出す
     """
     if not isinstance(answer, str):
         return ""
