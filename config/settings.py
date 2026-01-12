@@ -145,10 +145,9 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Email settings: use console in debug, SMTP in production
-EMAIL_BACKEND = (
-    'django.core.mail.backends.console.EmailBackend'
-    if DEBUG
-    else 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend"
 )
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
