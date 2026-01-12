@@ -18,7 +18,8 @@ click==8.3.1
 coloredlogs==15.0.1
 dataclasses-json==0.6.7
 distro==1.9.0
-Django==3.2.12
+dj-database-url==3.1.0
+Django==5.2.10
 django-formtools==2.5.1
 django-otp==1.5.4
 django-phonenumber-field==7.3.0
