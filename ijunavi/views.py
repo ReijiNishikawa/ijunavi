@@ -43,6 +43,11 @@ QUESTIONS = [
 ]
 
 
+def env_echo(request):
+    present = bool(os.environ.get("OPENAI_API_KEY"))
+    return HttpResponse(f"OPENAI_API_KEY set: {present}")
+
+
 def get_next_question(step, answers):
     while step < len(QUESTIONS):
         q = QUESTIONS[step]

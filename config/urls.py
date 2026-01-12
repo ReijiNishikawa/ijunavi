@@ -38,6 +38,7 @@ urlpatterns = [
     path('rag/init/', ijunavi_views.rag_init, name='rag_init'),
     path('rag/progress/', ijunavi_views.rag_progress, name='rag_progress'),
     path('rag/recommend/', ijunavi_views.rag_recommend, name='rag_recommend'),
+    path("debug-env/", ijunavi_views.env_echo),
 ]
 
 if settings.DEBUG:
